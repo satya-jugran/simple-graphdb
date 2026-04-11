@@ -154,7 +154,7 @@ graph.removeNode('A');
 graph.hasEdge('knows'); // true
 
 // With cascade - edge is also removed
-graph.removeNode('B', { cascade: true });
+graph.removeNode('B', true);
 graph.hasEdge('knows'); // false
 ```
 
