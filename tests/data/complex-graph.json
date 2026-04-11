@@ -1,0 +1,24 @@
+{
+  "nodes": [
+    { "name": "Alice", "properties": { "age": 30, "city": "NYC", "occupation": "Engineer" } },
+    { "name": "Bob", "properties": { "age": 25, "city": "LA", "occupation": "Designer" } },
+    { "name": "Charlie", "properties": { "age": 35, "city": "Chicago", "occupation": "Manager" } },
+    { "name": "David", "properties": { "age": 28, "city": "NYC", "occupation": "Developer" } },
+    { "name": "Eve", "properties": { "age": 32, "city": "Seattle", "occupation": "Data Scientist" } },
+    { "name": "Frank", "properties": { "age": 40, "city": "Boston", "occupation": "Director" } },
+    { "name": "Grace", "properties": { "age": 27, "city": "Austin", "occupation": "Designer" } },
+    { "name": "Henry", "properties": { "age": 33, "city": "Denver", "occupation": "Engineer" } }
+  ],
+  "edges": [
+    { "name": "Alice-knows-Bob", "sourceName": "Alice", "targetName": "Bob", "properties": { "since": 2019, "context": "work" } },
+    { "name": "Alice-manages-David", "sourceName": "Alice", "targetName": "David", "properties": { "since": 2020, "level": 1 } },
+    { "name": "Bob-friends-with-Grace", "sourceName": "Bob", "targetName": "Grace", "properties": { "since": 2018, "strength": "close" } },
+    { "name": "Bob-works-with-Henry", "sourceName": "Bob", "targetName": "Henry", "properties": { "since": 2021, "project": "Alpha" } },
+    { "name": "Charlie-manages-Eve", "sourceName": "Charlie", "targetName": "Eve", "properties": { "since": 2020, "level": 2 } },
+    { "name": "Charlie-manages-Frank", "sourceName": "Charlie", "targetName": "Frank", "properties": { "since": 2019, "level": 3 } },
+    { "name": "David-reports-to-Alice", "sourceName": "David", "targetName": "Alice", "properties": { "since": 2020 } },
+    { "name": "Eve-collaborates-with-Henry", "sourceName": "Eve", "targetName": "Henry", "properties": { "since": 2022, "project": "Beta" } },
+    { "name": "Frank-mentors-Grace", "sourceName": "Frank", "targetName": "Grace", "properties": { "since": 2021, "frequency": "weekly" } },
+    { "name": "Alice-wives-with-Eve", "sourceName": "Alice", "targetName": "Eve", "properties": { "since": 2021, "type": "personal" } }
+  ]
+}
