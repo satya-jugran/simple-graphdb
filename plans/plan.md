@@ -175,7 +175,7 @@ e:/Projects/graph/
 
 ### tsconfig.json
 - Target: ES2020
-- Module: ES2022
+- Module: nodenext
 - Strict mode enabled
 - Declaration files generation enabled
 - OutDir: dist/
@@ -197,7 +197,7 @@ Tests should cover:
 ## Example Usage
 
 ```typescript
-import { Graph } from '@graphdb/core';
+import { Graph } from 'simple-graphdb';
 
 // Create a new graph
 const graph = new Graph();
