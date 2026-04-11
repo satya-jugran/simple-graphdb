@@ -235,8 +235,15 @@ export class Graph {
    * @param sourceName - Name of the first node
    * @param targetName - Name of the second node
    * @returns Array of Edges between the nodes
+   * @throws NodeNotFoundError if either node doesn't exist
    */
   getEdgesBetween(sourceName: string, targetName: string): Edge[] {
+    if (!this._nodes.has(sourceName)) {
+      throw new NodeNotFoundError(sourceName);
+    }
+    if (!this._nodes.has(targetName)) {
+      throw new NodeNotFoundError(targetName);
+    }
     return Array.from(this._edges.values()).filter(
       (edge) =>
         (edge.sourceName === sourceName && edge.targetName === targetName) ||

@@ -212,6 +212,14 @@ describe('Graph', () => {
       expect(edges.map((e) => e.name)).toEqual(['knows-ab']);
     });
 
+    it('should throw NodeNotFoundError for getEdgesBetween when source does not exist', () => {
+      expect(() => graph.getEdgesBetween('NonExistent', 'Bob')).toThrow(NodeNotFoundError);
+    });
+
+    it('should throw NodeNotFoundError for getEdgesBetween when target does not exist', () => {
+      expect(() => graph.getEdgesBetween('Alice', 'NonExistent')).toThrow(NodeNotFoundError);
+    });
+
     it('should throw NodeNotFoundError for getParents on non-existent node', () => {
       expect(() => graph.getParents('NonExistent')).toThrow(NodeNotFoundError);
     });
