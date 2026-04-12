@@ -1,28 +1,39 @@
+import { randomUUID } from 'crypto';
 import type { NodeData } from './types';
 
 /**
  * Represents a node in the graph database.
- * Nodes are identified by a unique name and can store arbitrary JSON properties.
+ * Nodes are identified by a unique id and have a type (label).
  */
 export class Node {
-  private readonly _name: string;
+  private readonly _id: string;
+  private readonly _type: string;
   private readonly _properties: Readonly<Record<string, unknown>>;
 
   /**
    * Creates a new Node instance.
-   * @param name - Unique identifier for the node
+   * @param type - The type (label) of the node (e.g., "Course", "Chapter")
    * @param properties - Optional arbitrary JSON properties
+   * @param id - Optional id. If not provided, a UUID will be generated.
    */
-  constructor(name: string, properties: Record<string, unknown> = {}) {
-    this._name = name;
+  constructor(type: string, properties: Record<string, unknown> = {}, id?: string) {
+    this._id = id ?? randomUUID();
+    this._type = type;
     this._properties = Object.freeze({ ...properties });
   }
 
   /**
-   * Returns the unique name of this node.
+   * Returns the unique id of this node.
    */
-  get name(): string {
-    return this._name;
+  get id(): string {
+    return this._id;
+  }
+
+  /**
+   * Returns the type (label) of this node.
+   */
+  get type(): string {
+    return this._type;
   }
 
   /**
@@ -38,7 +49,8 @@ export class Node {
    */
   toJSON(): NodeData {
     return {
-      name: this._name,
+      id: this._id,
+      type: this._type,
       properties: { ...this._properties },
     };
   }

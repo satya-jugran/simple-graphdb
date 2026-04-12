@@ -1,53 +1,65 @@
+import { randomUUID } from 'crypto';
 import type { EdgeData } from './types';
 
 /**
- * Represents a directed edge in the graph database.
- * Edges are identified by a unique name and connect two existing nodes.
+ * Represents a directed edge (relationship) in the graph database.
+ * Edges connect two nodes and have a type (relationship type).
  */
 export class Edge {
-  private readonly _name: string;
-  private readonly _sourceName: string;
-  private readonly _targetName: string;
+  private readonly _id: string;
+  private readonly _sourceId: string;
+  private readonly _targetId: string;
+  private readonly _type: string;
   private readonly _properties: Readonly<Record<string, unknown>>;
 
   /**
    * Creates a new Edge instance.
-   * @param name - Unique identifier for the edge
-   * @param sourceName - Name of the source node
-   * @param targetName - Name of the target node
+   * @param sourceId - The id of the source node
+   * @param targetId - The id of the target node
+   * @param type - The relationship type (e.g., "CONTAINS", "AUTHOR_OF")
    * @param properties - Optional arbitrary JSON properties
+   * @param id - Optional id. If not provided, a UUID will be generated.
    */
   constructor(
-    name: string,
-    sourceName: string,
-    targetName: string,
-    properties: Record<string, unknown> = {}
+    sourceId: string,
+    targetId: string,
+    type: string,
+    properties: Record<string, unknown> = {},
+    id?: string
   ) {
-    this._name = name;
-    this._sourceName = sourceName;
-    this._targetName = targetName;
+    this._id = id ?? randomUUID();
+    this._sourceId = sourceId;
+    this._targetId = targetId;
+    this._type = type;
     this._properties = Object.freeze({ ...properties });
   }
 
   /**
-   * Returns the unique name of this edge.
+   * Returns the unique id of this edge.
    */
-  get name(): string {
-    return this._name;
+  get id(): string {
+    return this._id;
   }
 
   /**
-   * Returns the name of the source node.
+   * Returns the id of the source node.
    */
-  get sourceName(): string {
-    return this._sourceName;
+  get sourceId(): string {
+    return this._sourceId;
   }
 
   /**
-   * Returns the name of the target node.
+   * Returns the id of the target node.
    */
-  get targetName(): string {
-    return this._targetName;
+  get targetId(): string {
+    return this._targetId;
+  }
+
+  /**
+   * Returns the type (relationship type) of this edge.
+   */
+  get type(): string {
+    return this._type;
   }
 
   /**
@@ -63,9 +75,10 @@ export class Edge {
    */
   toJSON(): EdgeData {
     return {
-      name: this._name,
-      sourceName: this._sourceName,
-      targetName: this._targetName,
+      id: this._id,
+      sourceId: this._sourceId,
+      targetId: this._targetId,
+      type: this._type,
       properties: { ...this._properties },
     };
   }

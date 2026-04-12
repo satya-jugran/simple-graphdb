@@ -36,44 +36,44 @@ export class Graph {
 
   /**
    * Checks if a node exists in the graph.
-   * @param name - Name of the node
+   * @param id - Id of the node
    */
-  hasNode(name: string): boolean {
-    return this._nodes.has(name);
+  hasNode(id: string): boolean {
+    return this._nodes.has(id);
   }
 
   /**
    * Checks if an edge exists in the graph.
-   * @param name - Name of the edge
+   * @param id - Id of the edge
    */
-  hasEdge(name: string): boolean {
-    return this._edges.has(name);
+  hasEdge(id: string): boolean {
+    return this._edges.has(id);
   }
 
   /**
    * Adds a new node to the graph.
-   * @param name - Unique name for the node
+   * @param type - The type (label) of the node
    * @param properties - Optional JSON properties
    * @returns The newly created Node
-   * @throws NodeAlreadyExistsError if a node with this name already exists
+   * @throws NodeAlreadyExistsError if a node with this id already exists
    */
-  addNode(name: string, properties: Record<string, unknown> = {}): Node {
-    if (this._nodes.has(name)) {
-      throw new NodeAlreadyExistsError(name);
+  addNode(type: string, properties: Record<string, unknown> = {}): Node {
+    const node = new Node(type, properties);
+    if (this._nodes.has(node.id)) {
+      throw new NodeAlreadyExistsError(node.id);
     }
-    const node = new Node(name, properties);
-    this._nodes.set(name, node);
+    this._nodes.set(node.id, node);
     return node;
   }
 
   /**
    * Removes a node from the graph.
-   * @param name - Name of the node to remove
+   * @param id - Id of the node to remove
    * @param cascade - If true, also removes all incident edges (default: false)
    * @returns true if the node was removed, false if it didn't exist
    */
-  removeNode(name: string, cascade: boolean = false): boolean {
-    const node = this._nodes.get(name);
+  removeNode(id: string, cascade: boolean = false): boolean {
+    const node = this._nodes.get(id);
     if (!node) {
       return false;
     }
@@ -81,174 +81,275 @@ export class Graph {
     if (cascade) {
       // Remove all edges incident to this node
       const edgesToRemove = Array.from(this._edges.values()).filter(
-        (edge) => edge.sourceName === name || edge.targetName === name
+        (edge) => edge.sourceId === id || edge.targetId === id
       );
       for (const edge of edgesToRemove) {
-        this._edges.delete(edge.name);
+        this._edges.delete(edge.id);
       }
     }
 
-    this._nodes.delete(name);
+    this._nodes.delete(id);
     return true;
   }
 
   /**
-   * Retrieves a node by name.
-   * @param name - Name of the node
+   * Retrieves a node by id.
+   * @param id - Id of the node
    * @returns The Node if found, undefined otherwise
    */
-  getNode(name: string): Node | undefined {
-    return this._nodes.get(name);
+  getNode(id: string): Node | undefined {
+    return this._nodes.get(id);
+  }
+
+  /**
+   * Retrieves nodes by their type.
+   * @param type - The node type to filter by
+   * @returns Array of Nodes with the specified type
+   */
+  getNodesByType(type: string): Node[] {
+    return Array.from(this._nodes.values()).filter((node) => node.type === type);
+  }
+
+  /**
+   * Retrieves nodes by a property value.
+   * @param key - The property key to search
+   * @param value - The property value to match
+   * @returns Array of Nodes with the specified property value
+   */
+  getNodesByProperty(key: string, value: unknown): Node[] {
+    return Array.from(this._nodes.values()).filter(
+      (node) => node.properties[key] === value
+    );
   }
 
   /**
    * Adds a new directed edge to the graph.
-   * @param name - Unique name for the edge
-   * @param sourceName - Name of the source node
-   * @param targetName - Name of the target node
+   * @param sourceId - Id of the source node
+   * @param targetId - Id of the target node
+   * @param type - The relationship type
    * @param properties - Optional JSON properties
    * @returns The newly created Edge
    * @throws NodeNotFoundError if source or target node doesn't exist
-   * @throws EdgeAlreadyExistsError if an edge with this name already exists
+   * @throws EdgeAlreadyExistsError if an edge with this id already exists
    */
   addEdge(
-    name: string,
-    sourceName: string,
-    targetName: string,
+    sourceId: string,
+    targetId: string,
+    type: string,
     properties: Record<string, unknown> = {}
   ): Edge {
-    if (!this._nodes.has(sourceName)) {
-      throw new NodeNotFoundError(sourceName);
+    if (!this._nodes.has(sourceId)) {
+      throw new NodeNotFoundError(sourceId);
     }
-    if (!this._nodes.has(targetName)) {
-      throw new NodeNotFoundError(targetName);
-    }
-    if (this._edges.has(name)) {
-      throw new EdgeAlreadyExistsError(name);
+    if (!this._nodes.has(targetId)) {
+      throw new NodeNotFoundError(targetId);
     }
 
-    const edge = new Edge(name, sourceName, targetName, properties);
-    this._edges.set(name, edge);
+    const edge = new Edge(sourceId, targetId, type, properties);
+    if (this._edges.has(edge.id)) {
+      throw new EdgeAlreadyExistsError(edge.id);
+    }
+    this._edges.set(edge.id, edge);
     return edge;
   }
 
   /**
    * Removes an edge from the graph.
-   * @param name - Name of the edge to remove
+   * @param id - Id of the edge to remove
    * @returns true if the edge was removed, false if it didn't exist
    */
-  removeEdge(name: string): boolean {
-    return this._edges.delete(name);
+  removeEdge(id: string): boolean {
+    return this._edges.delete(id);
   }
 
   /**
-   * Retrieves an edge by name.
-   * @param name - Name of the edge
+   * Retrieves an edge by id.
+   * @param id - Id of the edge
    * @returns The Edge if found, undefined otherwise
    */
-  getEdge(name: string): Edge | undefined {
-    return this._edges.get(name);
+  getEdge(id: string): Edge | undefined {
+    return this._edges.get(id);
   }
 
   /**
    * Gets the parent nodes of a given node.
    * Parents are nodes that have edges pointing TO this node.
-   * @param nodeName - Name of the target node
+   * @param nodeId - Id of the target node
    * @returns Array of parent Nodes
    * @throws NodeNotFoundError if the node doesn't exist
    */
-  getParents(nodeName: string): Node[] {
-    if (!this._nodes.has(nodeName)) {
-      throw new NodeNotFoundError(nodeName);
+  getParents(nodeId: string): Node[] {
+    if (!this._nodes.has(nodeId)) {
+      throw new NodeNotFoundError(nodeId);
     }
 
-    const parentNames = new Set<string>();
+    const parentIds = new Set<string>();
     for (const edge of this._edges.values()) {
-      if (edge.targetName === nodeName) {
-        parentNames.add(edge.sourceName);
+      if (edge.targetId === nodeId) {
+        parentIds.add(edge.sourceId);
       }
     }
 
-    return Array.from(parentNames)
-      .map((name) => this._nodes.get(name)!)
+    return Array.from(parentIds)
+      .map((id) => this._nodes.get(id)!)
       .filter((node): node is Node => node !== undefined);
   }
 
   /**
    * Gets the child nodes of a given node.
    * Children are nodes that this node points TO.
-   * @param nodeName - Name of the source node
+   * @param nodeId - Id of the source node
    * @returns Array of child Nodes
    * @throws NodeNotFoundError if the node doesn't exist
    */
-  getChildren(nodeName: string): Node[] {
-    if (!this._nodes.has(nodeName)) {
-      throw new NodeNotFoundError(nodeName);
+  getChildren(nodeId: string): Node[] {
+    if (!this._nodes.has(nodeId)) {
+      throw new NodeNotFoundError(nodeId);
     }
 
-    const childNames = new Set<string>();
+    const childIds = new Set<string>();
     for (const edge of this._edges.values()) {
-      if (edge.sourceName === nodeName) {
-        childNames.add(edge.targetName);
+      if (edge.sourceId === nodeId) {
+        childIds.add(edge.targetId);
       }
     }
 
-    return Array.from(childNames)
-      .map((name) => this._nodes.get(name)!)
+    return Array.from(childIds)
+      .map((id) => this._nodes.get(id)!)
       .filter((node): node is Node => node !== undefined);
   }
 
   /**
    * Gets all edges originating from a node (outgoing edges).
-   * @param sourceName - Name of the source node
+   * @param sourceId - Id of the source node
    * @returns Array of outgoing Edges
    * @throws NodeNotFoundError if the node doesn't exist
    */
-  getEdgesFrom(sourceName: string): Edge[] {
-    if (!this._nodes.has(sourceName)) {
-      throw new NodeNotFoundError(sourceName);
+  getEdgesFrom(sourceId: string): Edge[] {
+    if (!this._nodes.has(sourceId)) {
+      throw new NodeNotFoundError(sourceId);
     }
 
     return Array.from(this._edges.values()).filter(
-      (edge) => edge.sourceName === sourceName
+      (edge) => edge.sourceId === sourceId
     );
   }
 
   /**
    * Gets all edges pointing to a node (incoming edges).
-   * @param targetName - Name of the target node
+   * @param targetId - Id of the target node
    * @returns Array of incoming Edges
    * @throws NodeNotFoundError if the node doesn't exist
    */
-  getEdgesTo(targetName: string): Edge[] {
-    if (!this._nodes.has(targetName)) {
-      throw new NodeNotFoundError(targetName);
+  getEdgesTo(targetId: string): Edge[] {
+    if (!this._nodes.has(targetId)) {
+      throw new NodeNotFoundError(targetId);
     }
 
     return Array.from(this._edges.values()).filter(
-      (edge) => edge.targetName === targetName
+      (edge) => edge.targetId === targetId
     );
   }
 
   /**
    * Gets all edges between two nodes (in either direction).
-   * @param sourceName - Name of the first node
-   * @param targetName - Name of the second node
+   * @param sourceId - Id of the first node
+   * @param targetId - Id of the second node
    * @returns Array of Edges between the nodes
    * @throws NodeNotFoundError if either node doesn't exist
    */
-  getEdgesBetween(sourceName: string, targetName: string): Edge[] {
-    if (!this._nodes.has(sourceName)) {
-      throw new NodeNotFoundError(sourceName);
+  getEdgesBetween(sourceId: string, targetId: string): Edge[] {
+    if (!this._nodes.has(sourceId)) {
+      throw new NodeNotFoundError(sourceId);
     }
-    if (!this._nodes.has(targetName)) {
-      throw new NodeNotFoundError(targetName);
+    if (!this._nodes.has(targetId)) {
+      throw new NodeNotFoundError(targetId);
     }
     return Array.from(this._edges.values()).filter(
       (edge) =>
-        (edge.sourceName === sourceName && edge.targetName === targetName) ||
-        (edge.sourceName === targetName && edge.targetName === sourceName)
+        (edge.sourceId === sourceId && edge.targetId === targetId) ||
+        (edge.sourceId === targetId && edge.targetId === sourceId)
     );
+  }
+
+  /**
+   * Gets all edges of a specific type.
+   * @param type - The edge type to filter by
+   * @returns Array of Edges with the specified type
+   */
+  getEdgesByType(type: string): Edge[] {
+    return Array.from(this._edges.values()).filter((edge) => edge.type === type);
+  }
+
+  /**
+   * Traverses the graph from source to target using the specified algorithm.
+   * @param sourceId - Id of the source node
+   * @param targetId - Id of the target node
+   * @param method - Traversal method: 'bfs' (breadth-first search) or 'dfs' (depth-first search). Default: 'bfs'
+   * @returns Array of node ids from source to target if path exists, null otherwise
+   */
+  traverse(
+    sourceId: string,
+    targetId: string,
+    method: 'bfs' | 'dfs' = 'bfs'
+  ): string[] | null {
+    if (!this._nodes.has(sourceId) || !this._nodes.has(targetId)) {
+      return null;
+    }
+
+    if (sourceId === targetId) {
+      return [sourceId];
+    }
+
+    // Build adjacency map for O(1) edge lookup
+    const adjacency = new Map<string, string[]>();
+    for (const edge of this._edges.values()) {
+      if (!adjacency.has(edge.sourceId)) {
+        adjacency.set(edge.sourceId, []);
+      }
+      adjacency.get(edge.sourceId)!.push(edge.targetId);
+    }
+
+    const visited = new Set<string>();
+    const parent = new Map<string, string | null>();
+    
+    // Use index-based queue for BFS to avoid O(n) shift()
+    const queue: string[] = [sourceId];
+    const stack: string[] = [sourceId];
+    let queueIndex = 0;
+
+    parent.set(sourceId, null);
+    visited.add(sourceId);
+
+    while (method === 'bfs' ? queueIndex < queue.length : stack.length > 0) {
+      const current = method === 'bfs'
+        ? queue[queueIndex++]
+        : stack.pop()!;
+
+      if (current === targetId) {
+        // Reconstruct path
+        const path: string[] = [];
+        let node: string | null = targetId;
+        while (node !== null) {
+          path.push(node);
+          node = parent.get(node) ?? null;
+        }
+        return path.reverse();
+      }
+
+      // Get children from adjacency map (O(1) lookup)
+      const children = adjacency.get(current) ?? [];
+      for (const childId of children) {
+        if (!visited.has(childId)) {
+          visited.add(childId);
+          parent.set(childId, current);
+          queue.push(childId);
+          stack.push(childId);
+        }
+      }
+    }
+
+    return null;
   }
 
   /**
@@ -257,6 +358,49 @@ export class Graph {
   clear(): void {
     this._nodes.clear();
     this._edges.clear();
+  }
+
+  /**
+   * Check if graph is a Directed Acyclic Graph (no cycles).
+   * Uses DFS-based cycle detection.
+   * @returns true if the graph has no cycles, false otherwise
+   */
+  isDAG(): boolean {
+    const visited = new Set<string>();
+    const visiting = new Set<string>();
+
+    const hasCycle = (nodeId: string): boolean => {
+      visited.add(nodeId);
+      visiting.add(nodeId);
+
+      // Check all edges from this node
+      for (const edge of this._edges.values()) {
+        if (edge.sourceId !== nodeId) continue;
+
+        if (!visited.has(edge.targetId)) {
+          if (hasCycle(edge.targetId)) {
+            return true;
+          }
+        } else if (visiting.has(edge.targetId)) {
+          // Found a back edge - cycle detected
+          return true;
+        }
+      }
+
+      visiting.delete(nodeId);
+      return false;
+    };
+
+    // Check all nodes
+    for (const node of this._nodes.values()) {
+      if (!visited.has(node.id)) {
+        if (hasCycle(node.id)) {
+          return false;
+        }
+      }
+    }
+
+    return true;
   }
 
   /**
@@ -274,23 +418,41 @@ export class Graph {
    * Creates a new Graph instance from serialized data.
    * @param data - GraphData to reconstruct from
    * @returns A new Graph instance with all nodes and edges
+   * @throws NodeAlreadyExistsError if a node id is duplicated
+   * @throws EdgeAlreadyExistsError if an edge id is duplicated
+   * @throws NodeNotFoundError if an edge references a non-existent node
    */
   static fromJSON(data: GraphData): Graph {
     const graph = new Graph();
 
-    // Add all nodes first
+    // Add all nodes first with validation
     for (const nodeData of data.nodes) {
-      graph.addNode(nodeData.name, nodeData.properties);
+      if (graph._nodes.has(nodeData.id)) {
+        throw new NodeAlreadyExistsError(nodeData.id);
+      }
+      const node = new Node(nodeData.type, nodeData.properties, nodeData.id);
+      graph._nodes.set(node.id, node);
     }
 
-    // Then add all edges (nodes must exist first)
+    // Then add all edges with validation
     for (const edgeData of data.edges) {
-      graph.addEdge(
-        edgeData.name,
-        edgeData.sourceName,
-        edgeData.targetName,
-        edgeData.properties
+      if (graph._edges.has(edgeData.id)) {
+        throw new EdgeAlreadyExistsError(edgeData.id);
+      }
+      if (!graph._nodes.has(edgeData.sourceId)) {
+        throw new NodeNotFoundError(edgeData.sourceId);
+      }
+      if (!graph._nodes.has(edgeData.targetId)) {
+        throw new NodeNotFoundError(edgeData.targetId);
+      }
+      const edge = new Edge(
+        edgeData.sourceId,
+        edgeData.targetId,
+        edgeData.type,
+        edgeData.properties,
+        edgeData.id
       );
+      graph._edges.set(edge.id, edge);
     }
 
     return graph;

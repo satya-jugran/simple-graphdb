@@ -2,7 +2,8 @@
  * Data transfer object for Node serialization
  */
 export interface NodeData {
-  name: string;
+  id: string;
+  type: string;
   properties: Record<string, unknown>;
 }
 
@@ -10,9 +11,10 @@ export interface NodeData {
  * Data transfer object for Edge serialization
  */
 export interface EdgeData {
-  name: string;
-  sourceName: string;
-  targetName: string;
+  id: string;
+  sourceId: string;
+  targetId: string;
+  type: string;
   properties: Record<string, unknown>;
 }
 

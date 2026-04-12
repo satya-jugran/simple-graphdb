@@ -1,24 +1,24 @@
 {
   "nodes": [
-    { "name": "Alice", "properties": { "age": 30, "city": "NYC", "occupation": "Engineer" } },
-    { "name": "Bob", "properties": { "age": 25, "city": "LA", "occupation": "Designer" } },
-    { "name": "Charlie", "properties": { "age": 35, "city": "Chicago", "occupation": "Manager" } },
-    { "name": "David", "properties": { "age": 28, "city": "NYC", "occupation": "Developer" } },
-    { "name": "Eve", "properties": { "age": 32, "city": "Seattle", "occupation": "Data Scientist" } },
-    { "name": "Frank", "properties": { "age": 40, "city": "Boston", "occupation": "Director" } },
-    { "name": "Grace", "properties": { "age": 27, "city": "Austin", "occupation": "Designer" } },
-    { "name": "Henry", "properties": { "age": 33, "city": "Denver", "occupation": "Engineer" } }
+    { "id": "alice-id", "type": "Person", "properties": { "name": "Alice", "age": 30, "city": "NYC", "occupation": "Engineer" } },
+    { "id": "bob-id", "type": "Person", "properties": { "name": "Bob", "age": 25, "city": "LA", "occupation": "Designer" } },
+    { "id": "charlie-id", "type": "Person", "properties": { "name": "Charlie", "age": 35, "city": "Chicago", "occupation": "Manager" } },
+    { "id": "david-id", "type": "Person", "properties": { "name": "David", "age": 28, "city": "NYC", "occupation": "Developer" } },
+    { "id": "eve-id", "type": "Person", "properties": { "name": "Eve", "age": 32, "city": "Seattle", "occupation": "Data Scientist" } },
+    { "id": "frank-id", "type": "Person", "properties": { "name": "Frank", "age": 40, "city": "Boston", "occupation": "Director" } },
+    { "id": "grace-id", "type": "Person", "properties": { "name": "Grace", "age": 27, "city": "Austin", "occupation": "Designer" } },
+    { "id": "henry-id", "type": "Person", "properties": { "name": "Henry", "age": 33, "city": "Denver", "occupation": "Engineer" } }
   ],
   "edges": [
-    { "name": "Alice-knows-Bob", "sourceName": "Alice", "targetName": "Bob", "properties": { "since": 2019, "context": "work" } },
-    { "name": "Alice-manages-David", "sourceName": "Alice", "targetName": "David", "properties": { "since": 2020, "level": 1 } },
-    { "name": "Bob-friends-with-Grace", "sourceName": "Bob", "targetName": "Grace", "properties": { "since": 2018, "strength": "close" } },
-    { "name": "Bob-works-with-Henry", "sourceName": "Bob", "targetName": "Henry", "properties": { "since": 2021, "project": "Alpha" } },
-    { "name": "Charlie-manages-Eve", "sourceName": "Charlie", "targetName": "Eve", "properties": { "since": 2020, "level": 2 } },
-    { "name": "Charlie-manages-Frank", "sourceName": "Charlie", "targetName": "Frank", "properties": { "since": 2019, "level": 3 } },
-    { "name": "David-reports-to-Alice", "sourceName": "David", "targetName": "Alice", "properties": { "since": 2020 } },
-    { "name": "Eve-collaborates-with-Henry", "sourceName": "Eve", "targetName": "Henry", "properties": { "since": 2022, "project": "Beta" } },
-    { "name": "Frank-mentors-Grace", "sourceName": "Frank", "targetName": "Grace", "properties": { "since": 2021, "frequency": "weekly" } },
-    { "name": "Alice-wives-with-Eve", "sourceName": "Alice", "targetName": "Eve", "properties": { "since": 2021, "type": "personal" } }
+    { "id": "alice-knows-bob", "sourceId": "alice-id", "targetId": "bob-id", "type": "KNOWS", "properties": { "since": 2019, "context": "work" } },
+    { "id": "alice-manages-david", "sourceId": "alice-id", "targetId": "david-id", "type": "MANAGES", "properties": { "since": 2020, "level": 1 } },
+    { "id": "bob-friends-with-grace", "sourceId": "bob-id", "targetId": "grace-id", "type": "FRIENDS_WITH", "properties": { "since": 2018, "strength": "close" } },
+    { "id": "bob-works-with-henry", "sourceId": "bob-id", "targetId": "henry-id", "type": "WORKS_WITH", "properties": { "since": 2021, "project": "Alpha" } },
+    { "id": "charlie-manages-eve", "sourceId": "charlie-id", "targetId": "eve-id", "type": "MANAGES", "properties": { "since": 2020, "level": 2 } },
+    { "id": "charlie-manages-frank", "sourceId": "charlie-id", "targetId": "frank-id", "type": "MANAGES", "properties": { "since": 2019, "level": 3 } },
+    { "id": "david-reports-to-alice", "sourceId": "david-id", "targetId": "alice-id", "type": "REPORTS_TO", "properties": { "since": 2020 } },
+    { "id": "eve-collaborates-with-henry", "sourceId": "eve-id", "targetId": "henry-id", "type": "COLLABORATES_WITH", "properties": { "since": 2022, "project": "Beta" } },
+    { "id": "frank-mentors-grace", "sourceId": "frank-id", "targetId": "grace-id", "type": "MENTORS", "properties": { "since": 2021, "frequency": "weekly" } },
+    { "id": "alice-wives-with-eve", "sourceId": "alice-id", "targetId": "eve-id", "type": "WIVES_WITH", "properties": { "since": 2021, "type": "personal" } }
   ]
 }
