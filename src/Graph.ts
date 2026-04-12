@@ -301,17 +301,30 @@ export class Graph {
       return [sourceId];
     }
 
+    // Build adjacency map for O(1) edge lookup
+    const adjacency = new Map<string, string[]>();
+    for (const edge of this._edges.values()) {
+      if (!adjacency.has(edge.sourceId)) {
+        adjacency.set(edge.sourceId, []);
+      }
+      adjacency.get(edge.sourceId)!.push(edge.targetId);
+    }
+
     const visited = new Set<string>();
     const parent = new Map<string, string | null>();
-    const queueOrStack: string[] = [sourceId];
+    
+    // Use index-based queue for BFS to avoid O(n) shift()
+    const queue: string[] = [sourceId];
+    const stack: string[] = [sourceId];
+    let queueIndex = 0;
 
     parent.set(sourceId, null);
     visited.add(sourceId);
 
-    while (queueOrStack.length > 0) {
+    while (method === 'bfs' ? queueIndex < queue.length : stack.length > 0) {
       const current = method === 'bfs'
-        ? queueOrStack.shift()!
-        : queueOrStack.pop()!;
+        ? queue[queueIndex++]
+        : stack.pop()!;
 
       if (current === targetId) {
         // Reconstruct path
@@ -324,12 +337,14 @@ export class Graph {
         return path.reverse();
       }
 
-      // Get children (nodes this node points to)
-      for (const edge of this._edges.values()) {
-        if (edge.sourceId === current && !visited.has(edge.targetId)) {
-          visited.add(edge.targetId);
-          parent.set(edge.targetId, current);
-          queueOrStack.push(edge.targetId);
+      // Get children from adjacency map (O(1) lookup)
+      const children = adjacency.get(current) ?? [];
+      for (const childId of children) {
+        if (!visited.has(childId)) {
+          visited.add(childId);
+          parent.set(childId, current);
+          queue.push(childId);
+          stack.push(childId);
         }
       }
     }
