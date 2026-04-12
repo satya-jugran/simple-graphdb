@@ -111,6 +111,24 @@ describe('Graph', () => {
       expect(thirties).toHaveLength(2);
       expect(thirties.map(n => n.properties.name).sort()).toEqual(['Alice', 'Charlie']);
     });
+
+    it('should return empty array when property value does not match', () => {
+      graph.addNode('Person', { name: 'Alice', age: 30 });
+      graph.addNode('Person', { name: 'Bob', age: 25 });
+
+      const nonexistent = graph.getNodesByProperty('age', 50);
+      expect(nonexistent).toHaveLength(0);
+    });
+
+    it('should find nodes by string property value', () => {
+      graph.addNode('Person', { name: 'Alice', city: 'NYC' });
+      graph.addNode('Person', { name: 'Bob', city: 'LA' });
+      graph.addNode('Person', { name: 'Charlie', city: 'NYC' });
+
+      const nycResidents = graph.getNodesByProperty('city', 'NYC');
+      expect(nycResidents).toHaveLength(2);
+      expect(nycResidents.map(n => n.properties.name).sort()).toEqual(['Alice', 'Charlie']);
+    });
   });
 
   describe('Edge Operations', () => {

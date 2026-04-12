@@ -25,7 +25,7 @@ describe('Education Graph', () => {
       expect(publishers).toHaveLength(1);
     });
 
-    it('should have 13 chapters for Python', () => {
+    it('should have 6 chapters for Python', () => {
       const pythonCourse = graph.getNodes().find(n => n.properties.name === 'Python');
       const chapters = graph.getChildren(pythonCourse!.id).filter(n => n.type === 'Chapter');
       expect(chapters).toHaveLength(6);
@@ -107,7 +107,7 @@ describe('Education Graph', () => {
       
       for (const exam of exams) {
         const tests = graph.getChildren(exam.id).filter(n => n.type === 'Test');
-        expect(tests.length).toBeGreaterThanOrEqual(2);
+        expect(tests.length).toBeGreaterThanOrEqual(3);
         expect(tests.length).toBeLessThanOrEqual(4);
       }
     });

@@ -19,12 +19,12 @@ describe('Complex Graph from JSON', () => {
     });
 
     it('should have all specified nodes by name', () => {
-      const nodeNames = graph.getNodesByProperty('name', '').map(n => n.properties.name).sort();
-      // We need to check nodes exist properly
-      const alice = graph.getNodes().find(n => n.properties.name === 'Alice');
-      const bob = graph.getNodes().find(n => n.properties.name === 'Bob');
-      expect(alice).toBeDefined();
-      expect(bob).toBeDefined();
+      const allNodes = graph.getNodes();
+      expect(allNodes).toHaveLength(8);
+      const nodeNames = allNodes.map(n => n.properties.name).sort();
+      expect(nodeNames).toEqual([
+        'Alice', 'Bob', 'Charlie', 'David', 'Eve', 'Frank', 'Grace', 'Henry',
+      ]);
     });
   });
 
