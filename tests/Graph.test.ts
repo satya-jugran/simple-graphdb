@@ -339,15 +339,17 @@ describe('Graph', () => {
     it('should serialize a graph with nodes and edges', () => {
       const aliceId = graph.addNode('Person', { name: 'Alice', age: 30 }).id;
       const bobId = graph.addNode('Person', { name: 'Bob', age: 25 }).id;
-      graph.addEdge(aliceId, bobId, 'KNOWS', { since: 2020 });
+      const edge = graph.addEdge(aliceId, bobId, 'KNOWS', { since: 2020 });
 
       const data = graph.toJSON();
       expect(data.nodes).toHaveLength(2);
       expect(data.edges).toHaveLength(1);
       expect(data.nodes[0]).toEqual({ id: aliceId, type: 'Person', properties: { name: 'Alice', age: 30 } });
       expect(data.nodes[1]).toEqual({ id: bobId, type: 'Person', properties: { name: 'Bob', age: 25 } });
+      expect(data.edges[0].id).toBeDefined();
+      expect(data.edges[0].id).toBe(edge.id);
       expect(data.edges[0]).toEqual({
-        id: data.edges[0].id,
+        id: edge.id,
         sourceId: aliceId,
         targetId: bobId,
         type: 'KNOWS',
