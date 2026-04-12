@@ -403,18 +403,33 @@ export class Graph {
    * Creates a new Graph instance from serialized data.
    * @param data - GraphData to reconstruct from
    * @returns A new Graph instance with all nodes and edges
+   * @throws NodeAlreadyExistsError if a node id is duplicated
+   * @throws EdgeAlreadyExistsError if an edge id is duplicated
+   * @throws NodeNotFoundError if an edge references a non-existent node
    */
   static fromJSON(data: GraphData): Graph {
     const graph = new Graph();
 
-    // Add all nodes first
+    // Add all nodes first with validation
     for (const nodeData of data.nodes) {
+      if (graph._nodes.has(nodeData.id)) {
+        throw new NodeAlreadyExistsError(nodeData.id);
+      }
       const node = new Node(nodeData.type, nodeData.properties, nodeData.id);
       graph._nodes.set(node.id, node);
     }
 
-    // Then add all edges (nodes must exist first)
+    // Then add all edges with validation
     for (const edgeData of data.edges) {
+      if (graph._edges.has(edgeData.id)) {
+        throw new EdgeAlreadyExistsError(edgeData.id);
+      }
+      if (!graph._nodes.has(edgeData.sourceId)) {
+        throw new NodeNotFoundError(edgeData.sourceId);
+      }
+      if (!graph._nodes.has(edgeData.targetId)) {
+        throw new NodeNotFoundError(edgeData.targetId);
+      }
       const edge = new Edge(
         edgeData.sourceId,
         edgeData.targetId,
