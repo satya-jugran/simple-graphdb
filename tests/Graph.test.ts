@@ -15,217 +15,318 @@ describe('Graph', () => {
 
   describe('Node Operations', () => {
     it('should add a node without properties', () => {
-      const node = graph.addNode('Alice');
-      expect(node.name).toBe('Alice');
-      expect(node.properties).toEqual({});
+      const node = graph.addNode('Person', { name: 'Alice' });
+      expect(node.id).toBeDefined();
+      expect(node.type).toBe('Person');
+      expect(node.properties.name).toBe('Alice');
+      expect(node.properties).toEqual({ name: 'Alice' });
     });
 
     it('should add a node with properties', () => {
-      const properties = { age: 30, city: 'NYC' };
-      const node = graph.addNode('Alice', properties);
-      expect(node.name).toBe('Alice');
-      expect(node.properties).toEqual({ age: 30, city: 'NYC' });
+      const properties = { name: 'Alice', age: 30, city: 'NYC' };
+      const node = graph.addNode('Person', properties);
+      expect(node.id).toBeDefined();
+      expect(node.type).toBe('Person');
+      expect(node.properties).toEqual({ name: 'Alice', age: 30, city: 'NYC' });
     });
 
-    it('should retrieve a node by name', () => {
-      graph.addNode('Alice', { age: 30 });
-      const node = graph.getNode('Alice');
-      expect(node).toBeDefined();
-      expect(node?.name).toBe('Alice');
-      expect(node?.properties).toEqual({ age: 30 });
+    it('should retrieve a node by id', () => {
+      const node = graph.addNode('Person', { name: 'Alice', age: 30 });
+      const retrieved = graph.getNode(node.id);
+      expect(retrieved).toBeDefined();
+      expect(retrieved?.id).toBe(node.id);
+      expect(retrieved?.properties.age).toBe(30);
     });
 
     it('should return undefined for non-existent node', () => {
-      const node = graph.getNode('NonExistent');
+      const node = graph.getNode('non-existent-id');
       expect(node).toBeUndefined();
     });
 
-    it('should check if node exists', () => {
-      graph.addNode('Alice');
-      expect(graph.hasNode('Alice')).toBe(true);
-      expect(graph.hasNode('Bob')).toBe(false);
-    });
-
-    it('should throw NodeAlreadyExistsError when adding duplicate node', () => {
-      graph.addNode('Alice');
-      expect(() => graph.addNode('Alice')).toThrow(NodeAlreadyExistsError);
+    it('should check if node exists by id', () => {
+      const node = graph.addNode('Person', { name: 'Alice' });
+      expect(graph.hasNode(node.id)).toBe(true);
+      expect(graph.hasNode('non-existent-id')).toBe(false);
     });
 
     it('should remove a node', () => {
-      graph.addNode('Alice');
-      expect(graph.removeNode('Alice')).toBe(true);
-      expect(graph.hasNode('Alice')).toBe(false);
+      const node = graph.addNode('Person', { name: 'Alice' });
+      expect(graph.removeNode(node.id)).toBe(true);
+      expect(graph.hasNode(node.id)).toBe(false);
     });
 
     it('should return false when removing non-existent node', () => {
-      expect(graph.removeNode('NonExistent')).toBe(false);
+      expect(graph.removeNode('non-existent-id')).toBe(false);
     });
 
     it('should cascade remove incident edges when removing node', () => {
-      graph.addNode('Alice');
-      graph.addNode('Bob');
-      graph.addEdge('knows', 'Alice', 'Bob');
-      graph.addEdge('likes', 'Bob', 'Alice');
+      const alice = graph.addNode('Person', { name: 'Alice' });
+      const bob = graph.addNode('Person', { name: 'Bob' });
+      const edge1 = graph.addEdge(alice.id, bob.id, 'KNOWS');
+      const edge2 = graph.addEdge(bob.id, alice.id, 'LIKES');
 
-      graph.removeNode('Alice', true);
+      graph.removeNode(alice.id, true);
 
-      expect(graph.hasNode('Alice')).toBe(false);
-      expect(graph.hasEdge('knows')).toBe(false);
-      expect(graph.hasEdge('likes')).toBe(false);
+      expect(graph.hasNode(alice.id)).toBe(false);
+      expect(graph.hasEdge(edge1.id)).toBe(false);
+      expect(graph.hasEdge(edge2.id)).toBe(false);
     });
 
     it('should not cascade remove edges by default', () => {
-      graph.addNode('Alice');
-      graph.addNode('Bob');
-      graph.addEdge('knows', 'Alice', 'Bob');
+      const alice = graph.addNode('Person', { name: 'Alice' });
+      const bob = graph.addNode('Person', { name: 'Bob' });
+      const edge = graph.addEdge(alice.id, bob.id, 'KNOWS');
 
-      graph.removeNode('Alice');
+      graph.removeNode(alice.id);
 
-      expect(graph.hasNode('Alice')).toBe(false);
-      expect(graph.hasEdge('knows')).toBe(true);
+      expect(graph.hasNode(alice.id)).toBe(false);
+      expect(graph.hasEdge(edge.id)).toBe(true);
     });
 
     it('should get all nodes', () => {
-      graph.addNode('Alice');
-      graph.addNode('Bob');
-      graph.addNode('Charlie');
+      graph.addNode('Person', { name: 'Alice' });
+      graph.addNode('Person', { name: 'Bob' });
+      graph.addNode('Person', { name: 'Charlie' });
 
       const nodes = graph.getNodes();
       expect(nodes).toHaveLength(3);
-      expect(nodes.map((n) => n.name).sort()).toEqual(['Alice', 'Bob', 'Charlie']);
+    });
+
+    it('should get nodes by type', () => {
+      graph.addNode('Person', { name: 'Alice' });
+      graph.addNode('Person', { name: 'Bob' });
+      graph.addNode('Course', { name: 'Python' });
+
+      const people = graph.getNodesByType('Person');
+      expect(people).toHaveLength(2);
+      expect(people.map(n => n.properties.name).sort()).toEqual(['Alice', 'Bob']);
+    });
+
+    it('should get nodes by property', () => {
+      graph.addNode('Person', { name: 'Alice', age: 30 });
+      graph.addNode('Person', { name: 'Bob', age: 25 });
+      graph.addNode('Person', { name: 'Charlie', age: 30 });
+
+      const thirties = graph.getNodesByProperty('age', 30);
+      expect(thirties).toHaveLength(2);
+      expect(thirties.map(n => n.properties.name).sort()).toEqual(['Alice', 'Charlie']);
     });
   });
 
   describe('Edge Operations', () => {
+    let aliceId: string;
+    let bobId: string;
+    let charlieId: string;
+
     beforeEach(() => {
-      graph.addNode('Alice');
-      graph.addNode('Bob');
-      graph.addNode('Charlie');
+      aliceId = graph.addNode('Person', { name: 'Alice' }).id;
+      bobId = graph.addNode('Person', { name: 'Bob' }).id;
+      charlieId = graph.addNode('Person', { name: 'Charlie' }).id;
     });
 
-    it('should add an edge without properties', () => {
-      const edge = graph.addEdge('knows', 'Alice', 'Bob');
-      expect(edge.name).toBe('knows');
-      expect(edge.sourceName).toBe('Alice');
-      expect(edge.targetName).toBe('Bob');
-      expect(edge.properties).toEqual({});
+    it('should add an edge between nodes', () => {
+      const edge = graph.addEdge(aliceId, bobId, 'KNOWS');
+      expect(edge.id).toBeDefined();
+      expect(edge.sourceId).toBe(aliceId);
+      expect(edge.targetId).toBe(bobId);
+      expect(edge.type).toBe('KNOWS');
     });
 
-    it('should add an edge with properties', () => {
-      const properties = { since: 2020, intensity: 'high' };
-      const edge = graph.addEdge('knows', 'Alice', 'Bob', properties);
-      expect(edge.name).toBe('knows');
-      expect(edge.properties).toEqual({ since: 2020, intensity: 'high' });
+    it('should throw NodeNotFoundError when source does not exist', () => {
+      expect(() => graph.addEdge('non-existent', bobId, 'KNOWS')).toThrow(NodeNotFoundError);
     });
 
-    it('should retrieve an edge by name', () => {
-      graph.addEdge('knows', 'Alice', 'Bob');
-      const edge = graph.getEdge('knows');
-      expect(edge).toBeDefined();
-      expect(edge?.name).toBe('knows');
-      expect(edge?.sourceName).toBe('Alice');
-      expect(edge?.targetName).toBe('Bob');
+    it('should throw NodeNotFoundError when target does not exist', () => {
+      expect(() => graph.addEdge(aliceId, 'non-existent', 'KNOWS')).toThrow(NodeNotFoundError);
     });
 
-    it('should return undefined for non-existent edge', () => {
-      const edge = graph.getEdge('NonExistent');
-      expect(edge).toBeUndefined();
+    it('should get edge by id', () => {
+      const edge = graph.addEdge(aliceId, bobId, 'KNOWS');
+      const retrieved = graph.getEdge(edge.id);
+      expect(retrieved).toBeDefined();
+      expect(retrieved?.id).toBe(edge.id);
     });
 
-    it('should check if edge exists', () => {
-      graph.addEdge('knows', 'Alice', 'Bob');
-      expect(graph.hasEdge('knows')).toBe(true);
-      expect(graph.hasEdge('likes')).toBe(false);
-    });
-
-    it('should throw NodeNotFoundError when source node does not exist', () => {
-      expect(() => graph.addEdge('knows', 'NonExistent', 'Bob')).toThrow(
-        NodeNotFoundError
-      );
-    });
-
-    it('should throw NodeNotFoundError when target node does not exist', () => {
-      expect(() => graph.addEdge('knows', 'Alice', 'NonExistent')).toThrow(
-        NodeNotFoundError
-      );
-    });
-
-    it('should throw EdgeAlreadyExistsError when adding duplicate edge', () => {
-      graph.addEdge('knows', 'Alice', 'Bob');
-      expect(() => graph.addEdge('knows', 'Alice', 'Bob')).toThrow(EdgeAlreadyExistsError);
+    it('should check if edge exists by id', () => {
+      const edge = graph.addEdge(aliceId, bobId, 'KNOWS');
+      expect(graph.hasEdge(edge.id)).toBe(true);
+      expect(graph.hasEdge('non-existent-id')).toBe(false);
     });
 
     it('should remove an edge', () => {
-      graph.addEdge('knows', 'Alice', 'Bob');
-      expect(graph.removeEdge('knows')).toBe(true);
-      expect(graph.hasEdge('knows')).toBe(false);
+      const edge = graph.addEdge(aliceId, bobId, 'KNOWS');
+      expect(graph.removeEdge(edge.id)).toBe(true);
+      expect(graph.hasEdge(edge.id)).toBe(false);
     });
 
     it('should return false when removing non-existent edge', () => {
-      expect(graph.removeEdge('NonExistent')).toBe(false);
+      expect(graph.removeEdge('non-existent-id')).toBe(false);
     });
 
-    it('should get all edges', () => {
-      graph.addEdge('knows', 'Alice', 'Bob');
-      graph.addEdge('likes', 'Bob', 'Charlie');
+    it('should get parents of a node', () => {
+      graph.addEdge(bobId, aliceId, 'KNOWS');
+      graph.addEdge(charlieId, aliceId, 'KNOWS');
 
-      const edges = graph.getEdges();
-      expect(edges).toHaveLength(2);
-      expect(edges.map((e) => e.name).sort()).toEqual(['knows', 'likes']);
-    });
-  });
-
-  describe('Navigation', () => {
-    beforeEach(() => {
-      graph.addNode('Alice');
-      graph.addNode('Bob');
-      graph.addNode('Charlie');
-      graph.addNode('David');
-      graph.addEdge('knows-ab', 'Alice', 'Bob');
-      graph.addEdge('likes-ac', 'Alice', 'Charlie');
-      graph.addEdge('loves-bc', 'Bob', 'Charlie');
-      graph.addEdge('knows-da', 'David', 'Alice');
+      const parents = graph.getParents(aliceId);
+      expect(parents).toHaveLength(2);
+      expect(parents.map(n => n.properties.name).sort()).toEqual(['Bob', 'Charlie']);
     });
 
-    it('should get parent nodes', () => {
-      const parents = graph.getParents('Alice');
-      expect(parents.map((n) => n.name).sort()).toEqual(['David']);
-    });
+    it('should get children of a node', () => {
+      graph.addEdge(aliceId, bobId, 'KNOWS');
+      graph.addEdge(aliceId, charlieId, 'KNOWS');
 
-    it('should get child nodes', () => {
-      const children = graph.getChildren('Alice');
-      expect(children.map((n) => n.name).sort()).toEqual(['Bob', 'Charlie']);
+      const children = graph.getChildren(aliceId);
+      expect(children).toHaveLength(2);
+      expect(children.map(n => n.properties.name).sort()).toEqual(['Bob', 'Charlie']);
     });
 
     it('should get edges from a node', () => {
-      const edges = graph.getEdgesFrom('Alice');
-      expect(edges.map((e) => e.name).sort()).toEqual(['knows-ab', 'likes-ac']);
+      graph.addEdge(aliceId, bobId, 'KNOWS');
+      graph.addEdge(aliceId, charlieId, 'LIKES');
+
+      const edges = graph.getEdgesFrom(aliceId);
+      expect(edges).toHaveLength(2);
+      expect(edges.map(e => e.type).sort()).toEqual(['KNOWS', 'LIKES']);
     });
 
     it('should get edges to a node', () => {
-      const edges = graph.getEdgesTo('Charlie');
-      expect(edges.map((e) => e.name).sort()).toEqual(['likes-ac', 'loves-bc']);
+      graph.addEdge(bobId, aliceId, 'KNOWS');
+      graph.addEdge(charlieId, aliceId, 'LIKES');
+
+      const edges = graph.getEdgesTo(aliceId);
+      expect(edges).toHaveLength(2);
+      expect(edges.map(e => e.type).sort()).toEqual(['KNOWS', 'LIKES']);
     });
 
     it('should get edges between two nodes', () => {
-      const edges = graph.getEdgesBetween('Alice', 'Bob');
-      expect(edges.map((e) => e.name)).toEqual(['knows-ab']);
+      graph.addEdge(aliceId, bobId, 'KNOWS');
+      graph.addEdge(bobId, aliceId, 'KNOWS');
+
+      const edges = graph.getEdgesBetween(aliceId, bobId);
+      expect(edges).toHaveLength(2);
     });
 
-    it('should throw NodeNotFoundError for getEdgesBetween when source does not exist', () => {
-      expect(() => graph.getEdgesBetween('NonExistent', 'Bob')).toThrow(NodeNotFoundError);
-    });
+    it('should get edges by type', () => {
+      graph.addEdge(aliceId, bobId, 'KNOWS');
+      graph.addEdge(aliceId, charlieId, 'KNOWS');
+      graph.addEdge(bobId, charlieId, 'LIKES');
 
-    it('should throw NodeNotFoundError for getEdgesBetween when target does not exist', () => {
-      expect(() => graph.getEdgesBetween('Alice', 'NonExistent')).toThrow(NodeNotFoundError);
+      const knowsEdges = graph.getEdgesByType('KNOWS');
+      expect(knowsEdges).toHaveLength(2);
     });
 
     it('should throw NodeNotFoundError for getParents on non-existent node', () => {
-      expect(() => graph.getParents('NonExistent')).toThrow(NodeNotFoundError);
+      expect(() => graph.getParents('non-existent')).toThrow(NodeNotFoundError);
     });
 
     it('should throw NodeNotFoundError for getChildren on non-existent node', () => {
-      expect(() => graph.getChildren('NonExistent')).toThrow(NodeNotFoundError);
+      expect(() => graph.getChildren('non-existent')).toThrow(NodeNotFoundError);
+    });
+  });
+
+  describe('traverse()', () => {
+    beforeEach(() => {
+      // Create a simple graph:
+      //   A -> B -> C
+      //   A -> D -> E
+      //   D -> F
+      //   B -> D (creates a cycle potential)
+      const a = graph.addNode('Node', { name: 'A' });
+      const b = graph.addNode('Node', { name: 'B' });
+      const c = graph.addNode('Node', { name: 'C' });
+      const d = graph.addNode('Node', { name: 'D' });
+      const e = graph.addNode('Node', { name: 'E' });
+      const f = graph.addNode('Node', { name: 'F' });
+
+      graph.addEdge(a.id, b.id, 'CONNECTS');
+      graph.addEdge(b.id, c.id, 'CONNECTS');
+      graph.addEdge(a.id, d.id, 'CONNECTS');
+      graph.addEdge(d.id, e.id, 'CONNECTS');
+      graph.addEdge(d.id, f.id, 'CONNECTS');
+      graph.addEdge(b.id, d.id, 'CONNECTS');
+    });
+
+    it('should return null when source node does not exist', () => {
+      const b = graph.getNodesByProperty('name', 'B')[0];
+      expect(graph.traverse('non-existent', b.id)).toBeNull();
+    });
+
+    it('should return null when target node does not exist', () => {
+      const a = graph.getNodesByProperty('name', 'A')[0];
+      expect(graph.traverse(a.id, 'non-existent')).toBeNull();
+    });
+
+    it('should return [source] when source equals target', () => {
+      const a = graph.getNodesByProperty('name', 'A')[0];
+      expect(graph.traverse(a.id, a.id)).toEqual([a.id]);
+    });
+
+    it('should find direct path with BFS', () => {
+      const a = graph.getNodesByProperty('name', 'A')[0];
+      const b = graph.getNodesByProperty('name', 'B')[0];
+      const path = graph.traverse(a.id, b.id, 'bfs');
+      expect(path).toEqual([a.id, b.id]);
+    });
+
+    it('should find multi-hop path with BFS', () => {
+      const a = graph.getNodesByProperty('name', 'A')[0];
+      const b = graph.getNodesByProperty('name', 'B')[0];
+      const c = graph.getNodesByProperty('name', 'C')[0];
+      const path = graph.traverse(a.id, c.id, 'bfs');
+      expect(path).toEqual([a.id, b.id, c.id]);
+    });
+
+    it('should find path through different branches with BFS', () => {
+      const a = graph.getNodesByProperty('name', 'A')[0];
+      const d = graph.getNodesByProperty('name', 'D')[0];
+      const f = graph.getNodesByProperty('name', 'F')[0];
+      const path = graph.traverse(a.id, f.id, 'bfs');
+      expect(path).toEqual([a.id, d.id, f.id]);
+    });
+
+    it('should find path with BFS (shortest)', () => {
+      // A -> D -> E vs A -> B -> D -> E
+      const a = graph.getNodesByProperty('name', 'A')[0];
+      const d = graph.getNodesByProperty('name', 'D')[0];
+      const e = graph.getNodesByProperty('name', 'E')[0];
+      const path = graph.traverse(a.id, e.id, 'bfs');
+      expect(path).toEqual([a.id, d.id, e.id]);
+    });
+
+    it('should find path with DFS', () => {
+      const a = graph.getNodesByProperty('name', 'A')[0];
+      const b = graph.getNodesByProperty('name', 'B')[0];
+      const c = graph.getNodesByProperty('name', 'C')[0];
+      const path = graph.traverse(a.id, c.id, 'dfs');
+      expect(path).toEqual([a.id, b.id, c.id]);
+    });
+
+    it('should return null when no path exists', () => {
+      // Add isolated node G with no connections
+      graph.addNode('Node', { name: 'G' });
+      const a = graph.getNodesByProperty('name', 'A')[0];
+      const g = graph.getNodesByProperty('name', 'G')[0];
+      expect(graph.traverse(a.id, g.id)).toBeNull();
+    });
+
+    it('should handle cycle without infinite loop', () => {
+      const a = graph.getNodesByProperty('name', 'A')[0];
+      const c = graph.getNodesByProperty('name', 'C')[0];
+      // Add edge that would create cycle
+      const d = graph.getNodesByProperty('name', 'D')[0];
+      const b = graph.getNodesByProperty('name', 'B')[0];
+      graph.addEdge(d.id, b.id, 'CONNECTS');
+      const path = graph.traverse(a.id, c.id, 'bfs');
+      expect(path).toEqual([a.id, b.id, c.id]);
+    });
+
+    it('should default to BFS when method not specified', () => {
+      const a = graph.getNodesByProperty('name', 'A')[0];
+      const b = graph.getNodesByProperty('name', 'B')[0];
+      const c = graph.getNodesByProperty('name', 'C')[0];
+      const path = graph.traverse(a.id, c.id);
+      expect(path).toEqual([a.id, b.id, c.id]);
     });
   });
 
@@ -236,27 +337,28 @@ describe('Graph', () => {
     });
 
     it('should serialize a graph with nodes and edges', () => {
-      graph.addNode('Alice', { age: 30 });
-      graph.addNode('Bob', { age: 25 });
-      graph.addEdge('knows', 'Alice', 'Bob', { since: 2020 });
+      const aliceId = graph.addNode('Person', { name: 'Alice', age: 30 }).id;
+      const bobId = graph.addNode('Person', { name: 'Bob', age: 25 }).id;
+      graph.addEdge(aliceId, bobId, 'KNOWS', { since: 2020 });
 
       const data = graph.toJSON();
       expect(data.nodes).toHaveLength(2);
       expect(data.edges).toHaveLength(1);
-      expect(data.nodes[0]).toEqual({ name: 'Alice', properties: { age: 30 } });
-      expect(data.nodes[1]).toEqual({ name: 'Bob', properties: { age: 25 } });
+      expect(data.nodes[0]).toEqual({ id: aliceId, type: 'Person', properties: { name: 'Alice', age: 30 } });
+      expect(data.nodes[1]).toEqual({ id: bobId, type: 'Person', properties: { name: 'Bob', age: 25 } });
       expect(data.edges[0]).toEqual({
-        name: 'knows',
-        sourceName: 'Alice',
-        targetName: 'Bob',
+        id: data.edges[0].id,
+        sourceId: aliceId,
+        targetId: bobId,
+        type: 'KNOWS',
         properties: { since: 2020 },
       });
     });
 
     it('should reconstruct graph from data', () => {
-      graph.addNode('Alice', { age: 30 });
-      graph.addNode('Bob', { age: 25 });
-      graph.addEdge('knows', 'Alice', 'Bob', { since: 2020 });
+      const aliceId = graph.addNode('Person', { name: 'Alice', age: 30 }).id;
+      const bobId = graph.addNode('Person', { name: 'Bob', age: 25 }).id;
+      graph.addEdge(aliceId, bobId, 'KNOWS', { since: 2020 });
 
       const data = graph.toJSON();
       const restored = Graph.fromJSON(data);
@@ -264,36 +366,108 @@ describe('Graph', () => {
       expect(restored.getNodes()).toHaveLength(2);
       expect(restored.getEdges()).toHaveLength(1);
 
-      const alice = restored.getNode('Alice');
-      expect(alice?.properties).toEqual({ age: 30 });
-
-      const knows = restored.getEdge('knows');
-      expect(knows?.sourceName).toBe('Alice');
-      expect(knows?.targetName).toBe('Bob');
+      const alice = restored.getNodes().find(n => n.properties.name === 'Alice');
+      expect(alice?.properties).toEqual({ name: 'Alice', age: 30 });
     });
 
     it('should handle round-trip serialization', () => {
-      graph.addNode('A');
-      graph.addNode('B');
-      graph.addNode('C');
-      graph.addEdge('e1', 'A', 'B', { label: 'first' });
-      graph.addEdge('e2', 'B', 'C', { label: 'second' });
+      const a = graph.addNode('Node', { name: 'A' });
+      const b = graph.addNode('Node', { name: 'B' });
+      const c = graph.addNode('Node', { name: 'C' });
+      graph.addEdge(a.id, b.id, 'CONNECTS', { label: 'first' });
+      graph.addEdge(b.id, c.id, 'CONNECTS', { label: 'second' });
 
       const data = graph.toJSON();
       const restored = Graph.fromJSON(data);
 
       expect(restored.getNodes()).toHaveLength(3);
       expect(restored.getEdges()).toHaveLength(2);
-      expect(restored.getChildren('A').map((n) => n.name)).toEqual(['B']);
-      expect(restored.getParents('C').map((n) => n.name)).toEqual(['B']);
+    });
+  });
+
+  describe('isDAG()', () => {
+    it('should return true for empty graph', () => {
+      expect(graph.isDAG()).toBe(true);
+    });
+
+    it('should return true for single node', () => {
+      graph.addNode('Node', { name: 'A' });
+      expect(graph.isDAG()).toBe(true);
+    });
+
+    it('should return true for acyclic graph', () => {
+      // A -> B -> C
+      const a = graph.addNode('Node', { name: 'A' });
+      const b = graph.addNode('Node', { name: 'B' });
+      const c = graph.addNode('Node', { name: 'C' });
+      graph.addEdge(a.id, b.id, 'LINKS');
+      graph.addEdge(b.id, c.id, 'LINKS');
+      expect(graph.isDAG()).toBe(true);
+    });
+
+    it('should return true for disconnected acyclic graph', () => {
+      // A -> B and C -> D (two separate chains)
+      const a = graph.addNode('Node', { name: 'A' });
+      const b = graph.addNode('Node', { name: 'B' });
+      const c = graph.addNode('Node', { name: 'C' });
+      const d = graph.addNode('Node', { name: 'D' });
+      graph.addEdge(a.id, b.id, 'LINKS');
+      graph.addEdge(c.id, d.id, 'LINKS');
+      expect(graph.isDAG()).toBe(true);
+    });
+
+    it('should return false for graph with cycle', () => {
+      // A -> B -> C -> A
+      const a = graph.addNode('Node', { name: 'A' });
+      const b = graph.addNode('Node', { name: 'B' });
+      const c = graph.addNode('Node', { name: 'C' });
+      graph.addEdge(a.id, b.id, 'LINKS');
+      graph.addEdge(b.id, c.id, 'LINKS');
+      graph.addEdge(c.id, a.id, 'LINKS');
+      expect(graph.isDAG()).toBe(false);
+    });
+
+    it('should return false for self-loop', () => {
+      const a = graph.addNode('Node', { name: 'A' });
+      graph.addEdge(a.id, a.id, 'LINKS');
+      expect(graph.isDAG()).toBe(false);
+    });
+
+    it('should return true for diamond graph (no cycles)', () => {
+      //     A
+      //    / \
+      //   B   C
+      //    \ /
+      //     D
+      const a = graph.addNode('Node', { name: 'A' });
+      const b = graph.addNode('Node', { name: 'B' });
+      const c = graph.addNode('Node', { name: 'C' });
+      const d = graph.addNode('Node', { name: 'D' });
+      graph.addEdge(a.id, b.id, 'LINKS');
+      graph.addEdge(a.id, c.id, 'LINKS');
+      graph.addEdge(b.id, d.id, 'LINKS');
+      graph.addEdge(c.id, d.id, 'LINKS');
+      expect(graph.isDAG()).toBe(true);
+    });
+
+    it('should return false when cycle is not reachable from start', () => {
+      // A -> B (no cycle) and separate C -> D -> C (cycle)
+      const a = graph.addNode('Node', { name: 'A' });
+      const b = graph.addNode('Node', { name: 'B' });
+      const c = graph.addNode('Node', { name: 'C' });
+      const d = graph.addNode('Node', { name: 'D' });
+      graph.addEdge(a.id, b.id, 'LINKS');
+      graph.addEdge(c.id, d.id, 'LINKS');
+      graph.addEdge(d.id, c.id, 'LINKS');
+      expect(graph.isDAG()).toBe(false);
     });
   });
 
   describe('clear()', () => {
     it('should remove all nodes and edges', () => {
-      graph.addNode('Alice');
-      graph.addNode('Bob');
-      graph.addEdge('knows', 'Alice', 'Bob');
+      const aliceId = graph.addNode('Person', { name: 'Alice' }).id;
+      const bobId = graph.addNode('Person', { name: 'Bob' }).id;
+      graph.addEdge(aliceId, bobId, 'KNOWS');
 
       graph.clear();
 

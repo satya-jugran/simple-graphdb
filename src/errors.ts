@@ -13,8 +13,8 @@ export class GraphError extends Error {
  * Error thrown when attempting to add a node that already exists
  */
 export class NodeAlreadyExistsError extends GraphError {
-  constructor(nodeName: string) {
-    super(`Node with name '${nodeName}' already exists`);
+  constructor(nodeId: string) {
+    super(`Node with id '${nodeId}' already exists`);
     this.name = 'NodeAlreadyExistsError';
     Object.setPrototypeOf(this, NodeAlreadyExistsError.prototype);
   }
@@ -24,8 +24,8 @@ export class NodeAlreadyExistsError extends GraphError {
  * Error thrown when attempting to add an edge that already exists
  */
 export class EdgeAlreadyExistsError extends GraphError {
-  constructor(edgeName: string) {
-    super(`Edge with name '${edgeName}' already exists`);
+  constructor(edgeId: string) {
+    super(`Edge with id '${edgeId}' already exists`);
     this.name = 'EdgeAlreadyExistsError';
     Object.setPrototypeOf(this, EdgeAlreadyExistsError.prototype);
   }
@@ -35,8 +35,8 @@ export class EdgeAlreadyExistsError extends GraphError {
  * Error thrown when a node is not found in the graph
  */
 export class NodeNotFoundError extends GraphError {
-  constructor(nodeName: string) {
-    super(`Node with name '${nodeName}' not found`);
+  constructor(nodeId: string) {
+    super(`Node with id '${nodeId}' not found`);
     this.name = 'NodeNotFoundError';
     Object.setPrototypeOf(this, NodeNotFoundError.prototype);
   }
@@ -46,8 +46,8 @@ export class NodeNotFoundError extends GraphError {
  * Error thrown when an edge is not found in the graph
  */
 export class EdgeNotFoundError extends GraphError {
-  constructor(edgeName: string) {
-    super(`Edge with name '${edgeName}' not found`);
+  constructor(edgeId: string) {
+    super(`Edge with id '${edgeId}' not found`);
     this.name = 'EdgeNotFoundError';
     Object.setPrototypeOf(this, EdgeNotFoundError.prototype);
   }

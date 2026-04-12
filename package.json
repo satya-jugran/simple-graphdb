@@ -1,13 +1,12 @@
 {
   "name": "simple-graphdb",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "A lightweight in-memory graph database",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
-    "test": "jest",
-    "example": "node examples/demo.js"
+    "test": "jest"
   },
   "keywords": [
     "graph",
