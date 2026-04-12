@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import type { NodeData } from './types';
 
 /**
@@ -16,7 +17,7 @@ export class Node {
    * @param id - Optional id. If not provided, a UUID will be generated.
    */
   constructor(type: string, properties: Record<string, unknown> = {}, id?: string) {
-    this._id = id ?? crypto.randomUUID();
+    this._id = id ?? randomUUID();
     this._type = type;
     this._properties = Object.freeze({ ...properties });
   }

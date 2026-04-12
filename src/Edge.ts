@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import type { EdgeData } from './types';
 
 /**
@@ -26,7 +27,7 @@ export class Edge {
     properties: Record<string, unknown> = {},
     id?: string
   ) {
-    this._id = id ?? crypto.randomUUID();
+    this._id = id ?? randomUUID();
     this._sourceId = sourceId;
     this._targetId = targetId;
     this._type = type;
