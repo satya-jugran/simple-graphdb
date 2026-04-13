@@ -1,6 +1,4 @@
 import type { GraphData } from '../types';
-import type { NodeData } from '../types';
-import type { EdgeData } from '../types';
 import { Node } from '../Node';
 import { Edge } from '../Edge';
 import { GraphIndex } from './GraphIndex';

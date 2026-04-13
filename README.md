@@ -37,7 +37,7 @@ const path = graph.traverse(pythonCourse.id, chapter1.id, { method: 'bfs' }); //
 
 // Type-filtered traversal
 const personPath = graph.traverse(author.id, pythonCourse.id, {
-  nodeType: 'Person',
+  nodeType: 'Author',
   edgeType: 'AUTHOR_OF'
 });
 

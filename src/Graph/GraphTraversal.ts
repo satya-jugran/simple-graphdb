@@ -46,44 +46,6 @@ export class GraphTraversal {
   }
 
   /**
-   * Builds an adjacency map for traversal with type filtering.
-   * @param nodeType - Filter for node types ('*' for all)
-   * @param edgeType - Filter for edge types ('*' for all)
-   * @returns Map of node id to array of target node ids
-   */
-  _buildAdjacencyMap(nodeType: string = '*', edgeType: string = '*'): Map<string, string[]> {
-    const adjacency = new Map<string, string[]>();
-
-    for (const edge of this._index._edges.values()) {
-      // Apply edge type filter
-      if (edgeType !== '*' && edge.type !== edgeType) {
-        continue;
-      }
-
-      // Apply node type filter for target node
-      const targetNode = this._index._nodes.get(edge.targetId);
-      if (!targetNode) continue;
-      if (nodeType !== '*' && targetNode.type !== nodeType) {
-        continue;
-      }
-
-      // Apply node type filter for source node (only if not already filtered by traversal starting point)
-      const sourceNode = this._index._nodes.get(edge.sourceId);
-      if (!sourceNode) continue;
-      if (nodeType !== '*' && sourceNode.type !== nodeType) {
-        continue;
-      }
-
-      if (!adjacency.has(edge.sourceId)) {
-        adjacency.set(edge.sourceId, []);
-      }
-      adjacency.get(edge.sourceId)!.push(edge.targetId);
-    }
-
-    return adjacency;
-  }
-
-  /**
    * Traverses the graph from source to target using the specified algorithm.
    * @param sourceId - Id of the source node
    * @param targetId - Id of the target node
