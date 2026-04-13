@@ -238,9 +238,10 @@ export class GraphTraversal {
     }
 
     const result: string[] = [];
+    let queueIndex = 0;
 
-    while (queue.length > 0) {
-      const current = queue.shift()!;
+    while (queueIndex < queue.length) {
+      const current = queue[queueIndex++];
       result.push(current);
 
       const neighbors = adjacency.get(current) ?? [];
