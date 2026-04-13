@@ -221,6 +221,10 @@ export class GraphTraversal {
     }
 
     for (const edge of this._index._edges.values()) {
+      // Skip edges with dangling endpoints (nodes removed without cascade)
+      if (!this._index._nodes.has(edge.sourceId) || !this._index._nodes.has(edge.targetId)) {
+        continue;
+      }
       adjacency.get(edge.sourceId)!.push(edge.targetId);
       inDegree.set(edge.targetId, (inDegree.get(edge.targetId) ?? 0) + 1);
     }
