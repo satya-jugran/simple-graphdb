@@ -217,7 +217,15 @@ npm test
 ## Testing
 
 The test suite includes:
-- `tests/Graph.test.ts` - Core functionality tests (76 tests)
+- `tests/graph/` - Graph core functionality tests (139 tests, organized by feature)
+  - `Graph.node.test.ts` - Node Operations (15 tests)
+  - `Graph.edge.test.ts` - Edge Operations (15 tests)
+  - `Graph.traverse.test.ts` - BFS/DFS traversal (20 tests)
+  - `Graph.serialization.test.ts` - Serialization round-trip (5 tests)
+  - `Graph.isDAG.test.ts` - Cycle detection (10 tests)
+  - `Graph.topologicalSort.test.ts` - Topological ordering (10 tests)
+  - `Graph.fromJSON.test.ts` - JSON validation (6 tests)
+  - `Graph.clear.test.ts` - Graph clearing (1 test)
 - `tests/ComplexGraph.test.ts` - Complex graph loaded from JSON (12 tests)
 - `tests/EducationGraph.test.ts` - Education domain graph tests (37 tests)
 - `tests/data/complex-graph.json` - Sample graph data with 8 Person nodes
