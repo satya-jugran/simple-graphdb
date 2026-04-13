@@ -112,7 +112,7 @@ describe('Complex Graph from JSON', () => {
     it('should find Bob works with Henry', () => {
       const bob = graph.getNodes().find(n => n.properties.name === 'Bob');
       const henry = graph.getNodes().find(n => n.properties.name === 'Henry');
-      const edges = graph.getEdgesBetween(bob!.id, henry!.id);
+      const edges = graph.getDirectEdgesBetween(bob!.id, henry!.id);
       expect(edges).toHaveLength(1);
     });
   });
@@ -129,7 +129,7 @@ describe('Complex Graph from JSON', () => {
     it('should find path from Alice to Grace via Bob', () => {
       const alice = graph.getNodes().find(n => n.properties.name === 'Alice');
       const grace = graph.getNodes().find(n => n.properties.name === 'Grace');
-      const path = graph.traverse(alice!.id, grace!.id, 'bfs');
+      const path = graph.traverse(alice!.id, grace!.id, { method: 'bfs' });
       expect(path).toBeDefined();
       expect(path).toContain(alice!.id);
       expect(path).toContain(grace!.id);
@@ -138,7 +138,7 @@ describe('Complex Graph from JSON', () => {
     it('should find path from Charlie to Henry via Eve', () => {
       const charlie = graph.getNodes().find(n => n.properties.name === 'Charlie');
       const henry = graph.getNodes().find(n => n.properties.name === 'Henry');
-      const path = graph.traverse(charlie!.id, henry!.id, 'bfs');
+      const path = graph.traverse(charlie!.id, henry!.id, { method: 'bfs' });
       expect(path).toBeDefined();
       expect(path).toContain(charlie!.id);
       expect(path).toContain(henry!.id);
@@ -147,7 +147,7 @@ describe('Complex Graph from JSON', () => {
     it('should handle cycle without infinite loop', () => {
       const alice = graph.getNodes().find(n => n.properties.name === 'Alice');
       const david = graph.getNodes().find(n => n.properties.name === 'David');
-      const path = graph.traverse(alice!.id, david!.id, 'bfs');
+      const path = graph.traverse(alice!.id, david!.id, { method: 'bfs' });
       expect(path).toBeDefined();
     });
 
@@ -155,27 +155,27 @@ describe('Complex Graph from JSON', () => {
       const grace = graph.getNodes().find(n => n.properties.name === 'Grace');
       const alice = graph.getNodes().find(n => n.properties.name === 'Alice');
       // Grace has no outgoing edges, so cannot reach Alice
-      const path = graph.traverse(grace!.id, alice!.id, 'bfs');
+      const path = graph.traverse(grace!.id, alice!.id, { method: 'bfs' });
       expect(path).toBeNull();
     });
 
     it('should return [source] when source equals target', () => {
       const alice = graph.getNodes().find(n => n.properties.name === 'Alice');
-      const path = graph.traverse(alice!.id, alice!.id, 'bfs');
+      const path = graph.traverse(alice!.id, alice!.id, { method: 'bfs' });
       expect(path).toEqual([alice!.id]);
     });
 
     it('should find direct neighbor path', () => {
       const alice = graph.getNodes().find(n => n.properties.name === 'Alice');
       const bob = graph.getNodes().find(n => n.properties.name === 'Bob');
-      const path = graph.traverse(alice!.id, bob!.id, 'bfs');
+      const path = graph.traverse(alice!.id, bob!.id, { method: 'bfs' });
       expect(path).toEqual([alice!.id, bob!.id]);
     });
 
     it('should find multi-hop path with DFS', () => {
       const alice = graph.getNodes().find(n => n.properties.name === 'Alice');
       const grace = graph.getNodes().find(n => n.properties.name === 'Grace');
-      const path = graph.traverse(alice!.id, grace!.id, 'dfs');
+      const path = graph.traverse(alice!.id, grace!.id, { method: 'dfs' });
       expect(path).toBeDefined();
       expect(path).toContain(alice!.id);
       expect(path).toContain(grace!.id);

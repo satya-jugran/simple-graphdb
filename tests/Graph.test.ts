@@ -221,7 +221,7 @@ describe('Graph', () => {
       graph.addEdge(aliceId, bobId, 'KNOWS');
       graph.addEdge(bobId, aliceId, 'KNOWS');
 
-      const edges = graph.getEdgesBetween(aliceId, bobId);
+      const edges = graph.getDirectEdgesBetween(aliceId, bobId);
       expect(edges).toHaveLength(2);
     });
 
@@ -283,7 +283,7 @@ describe('Graph', () => {
     it('should find direct path with BFS', () => {
       const a = graph.getNodesByProperty('name', 'A')[0];
       const b = graph.getNodesByProperty('name', 'B')[0];
-      const path = graph.traverse(a.id, b.id, 'bfs');
+      const path = graph.traverse(a.id, b.id, { method: 'bfs' });
       expect(path).toEqual([a.id, b.id]);
     });
 
@@ -291,7 +291,7 @@ describe('Graph', () => {
       const a = graph.getNodesByProperty('name', 'A')[0];
       const b = graph.getNodesByProperty('name', 'B')[0];
       const c = graph.getNodesByProperty('name', 'C')[0];
-      const path = graph.traverse(a.id, c.id, 'bfs');
+      const path = graph.traverse(a.id, c.id, { method: 'bfs' });
       expect(path).toEqual([a.id, b.id, c.id]);
     });
 
@@ -299,7 +299,7 @@ describe('Graph', () => {
       const a = graph.getNodesByProperty('name', 'A')[0];
       const d = graph.getNodesByProperty('name', 'D')[0];
       const f = graph.getNodesByProperty('name', 'F')[0];
-      const path = graph.traverse(a.id, f.id, 'bfs');
+      const path = graph.traverse(a.id, f.id, { method: 'bfs' });
       expect(path).toEqual([a.id, d.id, f.id]);
     });
 
@@ -308,7 +308,7 @@ describe('Graph', () => {
       const a = graph.getNodesByProperty('name', 'A')[0];
       const d = graph.getNodesByProperty('name', 'D')[0];
       const e = graph.getNodesByProperty('name', 'E')[0];
-      const path = graph.traverse(a.id, e.id, 'bfs');
+      const path = graph.traverse(a.id, e.id, { method: 'bfs' });
       expect(path).toEqual([a.id, d.id, e.id]);
     });
 
@@ -316,7 +316,7 @@ describe('Graph', () => {
       const a = graph.getNodesByProperty('name', 'A')[0];
       const b = graph.getNodesByProperty('name', 'B')[0];
       const c = graph.getNodesByProperty('name', 'C')[0];
-      const path = graph.traverse(a.id, c.id, 'dfs');
+      const path = graph.traverse(a.id, c.id, { method: 'dfs' });
       expect(path).toEqual([a.id, b.id, c.id]);
     });
 
@@ -335,7 +335,7 @@ describe('Graph', () => {
       const d = graph.getNodesByProperty('name', 'D')[0];
       const b = graph.getNodesByProperty('name', 'B')[0];
       graph.addEdge(d.id, b.id, 'CONNECTS');
-      const path = graph.traverse(a.id, c.id, 'bfs');
+      const path = graph.traverse(a.id, c.id, { method: 'bfs' });
       expect(path).toEqual([a.id, b.id, c.id]);
     });
 

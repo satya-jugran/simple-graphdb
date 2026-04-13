@@ -1,6 +1,6 @@
 # simple-graphdb
 
-A lightweight in-memory graph database with a Neo4j-like design.
+A lightweight in-memory graph database.
 
 ## Installation
 
@@ -33,7 +33,13 @@ const courses = graph.getParents(author.id);         // [pythonCourse]
 const courses = graph.getNodesByType('Course');
 
 // Find path between nodes
-const path = graph.traverse(pythonCourse.id, chapter1.id, 'bfs'); // [courseId, chapterId]
+const path = graph.traverse(pythonCourse.id, chapter1.id, { method: 'bfs' }); // [courseId, chapterId]
+
+// Type-filtered traversal
+const personPath = graph.traverse(author.id, pythonCourse.id, {
+  nodeType: 'Person',
+  edgeType: 'AUTHOR_OF'
+});
 
 // Check if graph is a DAG
 graph.isDAG(); // true
@@ -53,7 +59,7 @@ graph.isDAG(); // true
 | `hasNode(id: string): boolean` | Check if node exists |
 | `getNodes(): readonly Node[]` | Get all nodes |
 | `getNodesByType(type: string): Node[]` | Get all nodes of a given type |
-| `getNodesByProperty(key: string, value: unknown): Node[]` | Get nodes by property value |
+| `getNodesByProperty(key: string, value: unknown, options?: { nodeType?: string }): Node[]` | Get nodes by property value, optionally filtered by node type |
 
 #### Edge Operations
 
@@ -70,18 +76,29 @@ graph.isDAG(); // true
 
 | Method | Description |
 |--------|-------------|
-| `getParents(nodeId: string): Node[]` | Get nodes with edges pointing TO this node |
-| `getChildren(nodeId: string): Node[]` | Get nodes this node points TO |
-| `getEdgesFrom(sourceId: string): Edge[]` | Get outgoing edges from a node |
-| `getEdgesTo(targetId: string): Edge[]` | Get incoming edges to a node |
-| `getEdgesBetween(sourceId: string, targetId: string): Edge[]` | Get edges between two nodes |
+| `getParents(nodeId: string, options?: { nodeType?: string; edgeType?: string }): Node[]` | Get parent nodes with optional type filters |
+| `getChildren(nodeId: string, options?: { nodeType?: string; edgeType?: string }): Node[]` | Get child nodes with optional type filters |
+| `getEdgesFrom(sourceId: string, options?: { edgeType?: string }): Edge[]` | Get outgoing edges with optional type filter |
+| `getEdgesTo(targetId: string, options?: { edgeType?: string }): Edge[]` | Get incoming edges with optional type filter |
+| `getDirectEdgesBetween(sourceId: string, targetId: string, options?: { edgeType?: string }): Edge[]` | Get direct edges between two nodes |
 
 #### Traversal & Analysis
 
 | Method | Description |
 |--------|-------------|
-| `traverse(sourceId: string, targetId: string, method?: 'bfs' \| 'dfs'): string[] \| null` | Find path between nodes using BFS (default) or DFS |
+| `traverse(sourceId: string, targetId: string, options?: TraversalOptions): string[] \| null` | Find path with optional `method`, `nodeType`, and `edgeType` filters |
 | `isDAG(): boolean` | Check if graph is a Directed Acyclic Graph |
+| `topologicalSort(): string[] \| null` | Get nodes in topological order (DAGs only); returns null if cycles exist |
+
+#### TraversalOptions Interface
+
+```typescript
+interface TraversalOptions {
+  method?: 'bfs' | 'dfs';  // default: 'bfs'
+  nodeType?: string;        // filter by node type ('*' = all, default)
+  edgeType?: string;        // filter by edge type ('*' = all, default)
+}
+```
 
 #### Serialization
 

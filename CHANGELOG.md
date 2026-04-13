@@ -5,11 +5,46 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-04-12
+
+### 🚀 Performance Improvements
+
+1. **Adjacency Maps for O(1) Lookups**
+   - Added `_edgesBySource` and `_edgesByTarget` adjacency maps for constant-time edge lookups
+   - Added `_nodesByType` and `_edgesByType` type index maps for fast type-based queries
+   - `getParents()`, `getChildren()`, `getEdgesFrom()`, `getEdgesTo()`, `getDirectEdgesBetween()` now use adjacency maps instead of O(n) array iteration
+   - `getNodesByType()`, `getEdgesByType()` now use type index maps
+   - `isDAG()` uses adjacency map for cycle detection
+   - `removeNode(cascade)` uses adjacency maps for efficient incident edge cleanup
+
+### ✨ New Features
+
+1. **Type-Filtered Traversal**
+   - `traverse()` now accepts `TraversalOptions` with `nodeType` and `edgeType` filters
+   - `getParents()`, `getChildren()` now accept optional `nodeType` and `edgeType` filters
+   - `getEdgesFrom()`, `getEdgesTo()`, `getDirectEdgesBetween()` now accept optional `edgeType` filter
+   - `getNodesByProperty()` now accepts optional `nodeType` filter
+
+2. **Topological Sort**
+   - New `topologicalSort()` method using Kahn's algorithm
+   - Returns `string[]` (node IDs in dependency order) for DAGs
+   - Returns `null` if graph contains cycles
+   - Used by `toJSON()` to serialize DAG nodes in topological order
+
+3. **API Renaming**
+   - `getEdgesBetween()` renamed to `getDirectEdgesBetween()` for clarity (only finds direct edges, not multi-hop paths)
+
+### 📦 Exported Types
+
+- `TraversalOptions` interface now exported from main module
+
+---
+
 ## [2.0.0] - 2026-04-11
 
 ### 🚨 Breaking Changes
 
-This release introduces a Neo4j-like design with significant API changes.
+This release introduces significant API changes.
 
 #### Core Design Changes
 
