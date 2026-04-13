@@ -215,7 +215,7 @@ describe('Education Graph', () => {
       const chapters = graph.getChildren(python!.id).filter(n => n.type === 'Chapter');
       const firstChapter = chapters[0];
       
-      const path = graph.traverse(python!.id, firstChapter!.id, 'bfs');
+      const path = graph.traverse(python!.id, firstChapter!.id, { method: 'bfs' });
       expect(path).toEqual([python!.id, firstChapter!.id]);
     });
 
@@ -226,7 +226,7 @@ describe('Education Graph', () => {
       const sections = graph.getChildren(firstChapter!.id);
       const firstSection = sections[0];
       
-      const path = graph.traverse(python!.id, firstSection!.id, 'bfs');
+      const path = graph.traverse(python!.id, firstSection!.id, { method: 'bfs' });
       expect(path).toEqual([python!.id, firstChapter!.id, firstSection!.id]);
     });
 
@@ -235,7 +235,7 @@ describe('Education Graph', () => {
       const exams = graph.getChildren(python!.id).filter(n => n.type === 'Exam');
       const firstExam = exams[0];
       
-      const path = graph.traverse(python!.id, firstExam!.id, 'bfs');
+      const path = graph.traverse(python!.id, firstExam!.id, { method: 'bfs' });
       expect(path).toEqual([python!.id, firstExam!.id]);
     });
 
@@ -246,7 +246,7 @@ describe('Education Graph', () => {
       const tests = graph.getChildren(firstExam!.id);
       const firstTest = tests[0];
       
-      const path = graph.traverse(firstExam!.id, firstTest!.id, 'bfs');
+      const path = graph.traverse(firstExam!.id, firstTest!.id, { method: 'bfs' });
       expect(path).toEqual([firstExam!.id, firstTest!.id]);
     });
 
@@ -254,7 +254,7 @@ describe('Education Graph', () => {
       const author = graph.getNodes().find(n => n.properties.name === 'John Doe');
       const python = graph.getNodes().find(n => n.properties.name === 'Python');
       
-      const path = graph.traverse(author!.id, python!.id, 'bfs');
+      const path = graph.traverse(author!.id, python!.id, { method: 'bfs' });
       expect(path).toEqual([author!.id, python!.id]);
     });
 
@@ -262,7 +262,7 @@ describe('Education Graph', () => {
       const publisher = graph.getNodes().find(n => n.properties.name === "O'Reilly Media");
       const python = graph.getNodes().find(n => n.properties.name === 'Python');
       
-      const path = graph.traverse(publisher!.id, python!.id, 'bfs');
+      const path = graph.traverse(publisher!.id, python!.id, { method: 'bfs' });
       expect(path).toEqual([publisher!.id, python!.id]);
     });
 
@@ -271,7 +271,7 @@ describe('Education Graph', () => {
       const tags = graph.getChildren(python!.id).filter(n => n.type === 'Tag');
       const firstTag = tags[0];
       
-      const path = graph.traverse(python!.id, firstTag!.id, 'bfs');
+      const path = graph.traverse(python!.id, firstTag!.id, { method: 'bfs' });
       expect(path).toEqual([python!.id, firstTag!.id]);
     });
 
@@ -285,7 +285,7 @@ describe('Education Graph', () => {
       const nodejsChapters = graph.getChildren(nodejs!.id).filter(n => n.type === 'Chapter');
       const nodejsChapter = nodejsChapters[0];
       
-      const path = graph.traverse(pythonExam!.id, nodejsChapter!.id, 'bfs');
+      const path = graph.traverse(pythonExam!.id, nodejsChapter!.id, { method: 'bfs' });
       expect(path).toBeNull();
     });
 
@@ -294,8 +294,66 @@ describe('Education Graph', () => {
       const chapters = graph.getChildren(python!.id).filter(n => n.type === 'Chapter');
       const firstChapter = chapters[0];
       
-      const path = graph.traverse(python!.id, firstChapter!.id, 'dfs');
+      const path = graph.traverse(python!.id, firstChapter!.id, { method: 'dfs' });
       expect(path).toEqual([python!.id, firstChapter!.id]);
+    });
+
+    it('should combine nodeType and edgeType filters during traversal', () => {
+      // Use the education graph structure:
+      // Author -> Course (AUTHOR_OF)
+      // Course -> Chapter (CONTAINS)
+      // Course -> Exam (CONTAINS)
+      
+      const python = graph.getNodes().find(n => n.properties.name === 'Python');
+      const authors = graph.getNodes().filter(n => n.type === 'Author');
+      const author = authors[0];
+      
+      // Get direct children of Python course (chapters and exams)
+      const courseChildren = graph.getChildren(python!.id);
+      const chapters = courseChildren.filter(n => n.type === 'Chapter');
+      const firstChapter = chapters[0];
+      
+      // Get children of first chapter (sections)
+      const chapterChildren = graph.getChildren(firstChapter!.id);
+      const sections = chapterChildren.filter(n => n.type === 'Section');
+      const firstSection = sections[0];
+
+      // Test 1: Traverse from Author to Course (AUTHOR_OF edge)
+      const pathAuthorToCourse = graph.traverse(author!.id, python!.id, { method: 'bfs' });
+      expect(pathAuthorToCourse).toEqual([author!.id, python!.id]);
+
+      // Test 2: Traverse from Course to Chapter (CONTAINS edge) - without filters
+      const pathCourseToChapter = graph.traverse(python!.id, firstChapter!.id, { method: 'bfs' });
+      expect(pathCourseToChapter).toEqual([python!.id, firstChapter!.id]);
+
+      // Test 3: Traverse Course -> Chapter with nodeType=Chapter filter (should pass)
+      const pathWithNodeFilter = graph.traverse(python!.id, firstChapter!.id, {
+        method: 'bfs',
+        nodeType: 'Chapter'
+      });
+      expect(pathWithNodeFilter).toEqual([python!.id, firstChapter!.id]);
+
+      // Test 4: Traverse Course -> Chapter with edgeType=AUTHOR_OF (should fail - uses CONTAINS)
+      const pathWithEdgeFilter = graph.traverse(python!.id, firstChapter!.id, {
+        method: 'bfs',
+        edgeType: 'AUTHOR_OF'
+      });
+      expect(pathWithEdgeFilter).toBeNull();
+
+      // Test 5: Traverse Course -> Chapter with edgeType=CONTAINS (should pass)
+      const pathWithContains = graph.traverse(python!.id, firstChapter!.id, {
+        method: 'bfs',
+        edgeType: 'CONTAINS'
+      });
+      expect(pathWithContains).toEqual([python!.id, firstChapter!.id]);
+
+      // Test 6: Combine filters - nodeType=Chapter AND edgeType=CONTAINS (should pass)
+      const pathBothFilters = graph.traverse(python!.id, firstChapter!.id, {
+        method: 'bfs',
+        nodeType: 'Chapter',
+        edgeType: 'CONTAINS'
+      });
+      expect(pathBothFilters).toEqual([python!.id, firstChapter!.id]);
     });
   });
 

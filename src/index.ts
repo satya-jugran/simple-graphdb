@@ -7,6 +7,7 @@ export { Edge } from './Edge';
 export type { NodeData } from './types';
 export type { EdgeData } from './types';
 export type { GraphData } from './types';
+export type { TraversalOptions } from './Graph/TraversalOptions';
 
 // Error classes
 export {
