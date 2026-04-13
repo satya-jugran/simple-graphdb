@@ -101,18 +101,6 @@ export class GraphTraversal {
       return null;
     }
 
-    // Apply source node type filter
-    const sourceNode = this._index._nodes.get(sourceId)!;
-    if (nodeType !== '*' && sourceNode.type !== nodeType) {
-      return null;
-    }
-
-    // Apply target node type filter
-    const targetNode = this._index._nodes.get(targetId)!;
-    if (nodeType !== '*' && targetNode.type !== nodeType) {
-      return null;
-    }
-
     if (sourceId === targetId) {
       return [sourceId];
     }

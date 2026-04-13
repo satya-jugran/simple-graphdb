@@ -297,6 +297,64 @@ describe('Education Graph', () => {
       const path = graph.traverse(python!.id, firstChapter!.id, { method: 'dfs' });
       expect(path).toEqual([python!.id, firstChapter!.id]);
     });
+
+    it('should combine nodeType and edgeType filters during traversal', () => {
+      // Use the education graph structure:
+      // Author -> Course (AUTHOR_OF)
+      // Course -> Chapter (CONTAINS)
+      // Course -> Exam (CONTAINS)
+      
+      const python = graph.getNodes().find(n => n.properties.name === 'Python');
+      const authors = graph.getNodes().filter(n => n.type === 'Author');
+      const author = authors[0];
+      
+      // Get direct children of Python course (chapters and exams)
+      const courseChildren = graph.getChildren(python!.id);
+      const chapters = courseChildren.filter(n => n.type === 'Chapter');
+      const firstChapter = chapters[0];
+      
+      // Get children of first chapter (sections)
+      const chapterChildren = graph.getChildren(firstChapter!.id);
+      const sections = chapterChildren.filter(n => n.type === 'Section');
+      const firstSection = sections[0];
+
+      // Test 1: Traverse from Author to Course (AUTHOR_OF edge)
+      const pathAuthorToCourse = graph.traverse(author!.id, python!.id, { method: 'bfs' });
+      expect(pathAuthorToCourse).toEqual([author!.id, python!.id]);
+
+      // Test 2: Traverse from Course to Chapter (CONTAINS edge) - without filters
+      const pathCourseToChapter = graph.traverse(python!.id, firstChapter!.id, { method: 'bfs' });
+      expect(pathCourseToChapter).toEqual([python!.id, firstChapter!.id]);
+
+      // Test 3: Traverse Course -> Chapter with nodeType=Chapter filter (should pass)
+      const pathWithNodeFilter = graph.traverse(python!.id, firstChapter!.id, {
+        method: 'bfs',
+        nodeType: 'Chapter'
+      });
+      expect(pathWithNodeFilter).toEqual([python!.id, firstChapter!.id]);
+
+      // Test 4: Traverse Course -> Chapter with edgeType=AUTHOR_OF (should fail - uses CONTAINS)
+      const pathWithEdgeFilter = graph.traverse(python!.id, firstChapter!.id, {
+        method: 'bfs',
+        edgeType: 'AUTHOR_OF'
+      });
+      expect(pathWithEdgeFilter).toBeNull();
+
+      // Test 5: Traverse Course -> Chapter with edgeType=CONTAINS (should pass)
+      const pathWithContains = graph.traverse(python!.id, firstChapter!.id, {
+        method: 'bfs',
+        edgeType: 'CONTAINS'
+      });
+      expect(pathWithContains).toEqual([python!.id, firstChapter!.id]);
+
+      // Test 6: Combine filters - nodeType=Chapter AND edgeType=CONTAINS (should pass)
+      const pathBothFilters = graph.traverse(python!.id, firstChapter!.id, {
+        method: 'bfs',
+        nodeType: 'Chapter',
+        edgeType: 'CONTAINS'
+      });
+      expect(pathBothFilters).toEqual([python!.id, firstChapter!.id]);
+    });
   });
 
   describe('Serialization', () => {
