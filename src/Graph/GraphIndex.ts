@@ -289,8 +289,11 @@ export class GraphIndex {
     const edgeType = options?.edgeType ?? '*';
 
     for (const edgeId of edgeIds) {
-      const edge = this._edges.get(edgeId)!;
-      const sourceNode = this._nodes.get(edge.sourceId)!;
+      const edge = this._edges.get(edgeId);
+      if (!edge) continue;
+      
+      const sourceNode = this._nodes.get(edge.sourceId);
+      if (!sourceNode) continue;
       
       if (edgeType !== '*' && edge.type !== edgeType) {
         continue;
@@ -326,8 +329,11 @@ export class GraphIndex {
     const edgeType = options?.edgeType ?? '*';
 
     for (const edgeId of edgeIds) {
-      const edge = this._edges.get(edgeId)!;
-      const targetNode = this._nodes.get(edge.targetId)!;
+      const edge = this._edges.get(edgeId);
+      if (!edge) continue;
+      
+      const targetNode = this._nodes.get(edge.targetId);
+      if (!targetNode) continue;
       
       if (edgeType !== '*' && edge.type !== edgeType) {
         continue;
@@ -360,7 +366,7 @@ export class GraphIndex {
     const edgeType = options?.edgeType ?? '*';
 
     return Array.from(edgeIds)
-      .map((id) => this._edges.get(id)!)
+      .map((id) => this._edges.get(id))
       .filter((edge): edge is Edge => edge !== undefined)
       .filter((edge) => edgeType === '*' || edge.type === edgeType);
   }
@@ -381,7 +387,7 @@ export class GraphIndex {
     const edgeType = options?.edgeType ?? '*';
 
     return Array.from(edgeIds)
-      .map((id) => this._edges.get(id)!)
+      .map((id) => this._edges.get(id))
       .filter((edge): edge is Edge => edge !== undefined)
       .filter((edge) => edgeType === '*' || edge.type === edgeType);
   }
@@ -411,7 +417,8 @@ export class GraphIndex {
 
     // Check edges from sourceId to targetId
     for (const edgeId of outgoingEdgeIds) {
-      const edge = this._edges.get(edgeId)!;
+      const edge = this._edges.get(edgeId);
+      if (!edge) continue;
       if (edge.targetId === targetId && (edgeType === '*' || edge.type === edgeType)) {
         result.push(edge);
       }
@@ -419,7 +426,8 @@ export class GraphIndex {
 
     // Check edges from targetId to sourceId
     for (const edgeId of incomingEdgeIds) {
-      const edge = this._edges.get(edgeId)!;
+      const edge = this._edges.get(edgeId);
+      if (!edge) continue;
       if (edge.targetId === sourceId && (edgeType === '*' || edge.type === edgeType)) {
         result.push(edge);
       }
