@@ -33,13 +33,21 @@ const courses = graph.getParents(author.id);         // [pythonCourse]
 const courses = graph.getNodesByType('Course');
 
 // Find path between nodes
-const path = graph.traverse(pythonCourse.id, chapter1.id, { method: 'bfs' }); // [courseId, chapterId]
+const paths = graph.traverse(pythonCourse.id, chapter1.id, { method: 'bfs' }); // [[courseId, chapterId]]
 
 // Type-filtered traversal
-const personPath = graph.traverse(author.id, pythonCourse.id, {
-  nodeType: 'Author',
-  edgeType: 'AUTHOR_OF'
+const personPaths = graph.traverse(author.id, pythonCourse.id, {
+  nodeTypes: ['Author'],
+  edgeTypes: ['AUTHOR_OF']
 });
+
+// Wildcard traversal - find all authors of a course
+const authors = graph.traverse('*', pythonCourse.id, {
+  edgeTypes: ['AUTHOR_OF']
+}); // [[authorId1, courseId], [authorId2, courseId]]
+
+// Find all reachable nodes from a source
+const allPaths = graph.traverse(pythonCourse.id, '*'); // [[courseId, child1], [courseId, child2], ...]
 
 // Check if graph is a DAG
 graph.isDAG(); // true
@@ -86,7 +94,7 @@ graph.isDAG(); // true
 
 | Method | Description |
 |--------|-------------|
-| `traverse(sourceId: string, targetId: string, options?: TraversalOptions): string[] \| null` | Find path with optional `method`, `nodeType`, and `edgeType` filters |
+| `traverse(sourceId: string \| string[], targetId: string \| string[], options?: TraversalOptions): string[][] \| null` | Find path(s) between the given source and target node(s), using the selected `method` and optional `nodeTypes` and `edgeTypes` filters |
 | `isDAG(): boolean` | Check if graph is a Directed Acyclic Graph |
 | `topologicalSort(): string[] \| null` | Get nodes in topological order (DAGs only); returns null if cycles exist |
 
@@ -94,10 +102,29 @@ graph.isDAG(); // true
 
 ```typescript
 interface TraversalOptions {
-  method?: 'bfs' | 'dfs';  // default: 'bfs'
-  nodeType?: string;        // filter by node type ('*' = all, default)
-  edgeType?: string;        // filter by edge type ('*' = all, default)
+  method?: 'bfs' | 'dfs';           // default: 'bfs'
+  nodeTypes?: string[];              // filter by node types (['*'] = all, default)
+  edgeTypes?: string[];              // filter by edge types (['*'] = all, default)
+  maxResults?: number;              // limit number of paths returned (default: 100)
 }
+```
+
+#### Wildcard Support
+
+The `traverse()` method supports wildcards for flexible path finding:
+
+```typescript
+// Find a path to a specific target from each matching source
+graph.traverse('*', targetId);
+
+// Find a path from a specific source to each reachable target
+graph.traverse(sourceId, '*');
+
+// Find a representative path for each matching source/target pair in the graph
+graph.traverse('*', '*');
+
+// Find a path for each matching source/target combination
+graph.traverse(['id1', 'id2'], ['id3', 'id4']);
 ```
 
 #### Serialization

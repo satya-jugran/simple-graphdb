@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.0] - 2026-04-14
+
+### 🚨 Breaking Changes
+
+1. **TraversalOptions API Updated**
+   - `nodeType` renamed to `nodeTypes` (array instead of single string)
+   - `edgeType` renamed to `edgeTypes` (array instead of single string)
+   - Default value changed from `'*'` to `['*']` (wildcard array means include all)
+
+2. **traverse() Return Type Changed**
+   - Old: `string[] | null` (single path)
+   - New: `string[][] | null` (array of paths)
+   - Source and target now accept wildcards: `string | string[]`
+
+### ✨ New Features
+
+1. **Wildcard Traversal**
+   - `traverse('*', target)` - find one path for each matching source to target
+   - `traverse(source, '*')` - find one path from source to each matching target
+   - `traverse('*', '*')` - find one path for each matching source/target combination
+   - `traverse(['a', 'b'], ['x', 'y'])` - find one path for each matching source/target pair between the provided node sets
+
+2. **Multi-Type Filtering**
+   - `nodeTypes: ['TypeA', 'TypeB']` - match nodes of type A OR B
+   - `edgeTypes: ['EDGE1', 'EDGE2']` - match edges of type 1 OR 2
+   - Wildcard `'*'` in array means include all types
+
+3. **maxResults Option**
+   - `maxResults: number` - limit number of paths returned during wildcard traversal (default: 100)
+   - Useful for large graphs where only first N paths are needed
+   - Paths are returned in source→target order until limit is reached
+
+---
+
 ## [2.1.0] - 2026-04-12
 
 ### 🚀 Performance Improvements

@@ -11,11 +11,11 @@ export class GraphTraversal {
   /**
    * Gets traversable children for a given node during type-filtered traversal.
    * @param nodeId - The source node id
-   * @param nodeType - Filter for node types ('*' for all)
-   * @param edgeType - Filter for edge types ('*' for all)
+   * @param nodeTypes - Filter for node types (array with '*' for all, default: ['*'])
+   * @param edgeTypes - Filter for edge types (array with '*' for all, default: ['*'])
    * @returns Array of child node ids that pass the type filters
    */
-  _getTraversableChildren(nodeId: string, nodeType: string = '*', edgeType: string = '*'): string[] {
+  _getTraversableChildren(nodeId: string, nodeTypes: string[] = ['*'], edgeTypes: string[] = ['*']): string[] {
     const edgeIds = this._index._edgesBySource.get(nodeId);
     if (!edgeIds) {
       return [];
@@ -27,15 +27,17 @@ export class GraphTraversal {
       const edge = this._index._edges.get(edgeId);
       if (!edge) continue;
 
-      // Apply edge type filter
-      if (edgeType !== '*' && edge.type !== edgeType) {
+      // Apply edge type filter - include all if array is empty, contains '*', or matches
+      const shouldFilterEdge = edgeTypes.length > 0 && !edgeTypes.includes('*');
+      if (shouldFilterEdge && !edgeTypes.includes(edge.type)) {
         continue;
       }
 
       // Apply node type filter for target node
       const targetNode = this._index._nodes.get(edge.targetId);
       if (!targetNode) continue;
-      if (nodeType !== '*' && targetNode.type !== nodeType) {
+      const shouldFilterNode = nodeTypes.length > 0 && !nodeTypes.includes('*');
+      if (shouldFilterNode && !nodeTypes.includes(targetNode.type)) {
         continue;
       }
 
@@ -46,18 +48,74 @@ export class GraphTraversal {
   }
 
   /**
+   * Normalizes source/target input to an array of node IDs.
+   * '*', [], and ['*'] all expand to all node IDs in the graph.
+   * @param input - Single ID, '*', or array of IDs
+   * @returns Array of node IDs
+   */
+  private _normalizeToNodeIds(input: string | string[]): string[] {
+    if (Array.isArray(input)) {
+      if (input.length === 0 || input.includes('*')) {
+        return Array.from(this._index._nodes.keys());  // Expand to all nodes
+      }
+      return input;
+    }
+    if (input === '*') {
+      return Array.from(this._index._nodes.keys());
+    }
+    return [input];
+  }
+
+  /**
    * Traverses the graph from source to target using the specified algorithm.
-   * @param sourceId - Id of the source node
-   * @param targetId - Id of the target node
-   * @param options - Traversal options including method, nodeType, and edgeType filters
-   * @returns Array of node ids from source to target if path exists, null otherwise
+   * Supports wildcards: '*' or array of ids for source/target to find multiple paths.
+   * @param sourceId - Id of the source node (or '*' for all nodes, or array of ids)
+   * @param targetId - Id of the target node (or '*' for all nodes, or array of ids)
+   * @param options - Traversal options including method, nodeTypes, and edgeTypes filters
+   * @returns Array of paths (each path is array of node ids), or null if no paths found
    */
   traverse(
+    sourceId: string | string[],
+    targetId: string | string[],
+    options: TraversalOptions = {}
+  ): string[][] | null {
+    const sources = this._normalizeToNodeIds(sourceId);
+    const targets = this._normalizeToNodeIds(targetId);
+
+    const allPaths: string[][] = [];
+    const maxResults = options.maxResults ?? 100;
+
+    for (const src of sources) {
+      for (const tgt of targets) {
+        const path = this._traverseSingle(src, tgt, options);
+        if (path !== null) {
+          allPaths.push(path);
+          if (maxResults && allPaths.length >= maxResults) {
+            break;
+          }
+        }
+      }
+      if (maxResults && allPaths.length >= maxResults) {
+        break;
+      }
+    }
+
+    return allPaths.length > 0 ? allPaths : null;
+  }
+
+  /**
+   * Internal method to traverse from a single source to a single target.
+   * @param sourceId - Single source node id
+   * @param targetId - Single target node id
+   * @param options - Traversal options
+   * @returns Single path as array of node ids, or null if no path exists
+   */
+  private _traverseSingle(
     sourceId: string,
     targetId: string,
-    options: TraversalOptions = {}
+    options: TraversalOptions
   ): string[] | null {
-    const { method = 'bfs', nodeType = '*', edgeType = '*' } = options;
+    const { method = 'bfs', nodeTypes = ['*'], edgeTypes = ['*'] } = options;
 
     if (!this._index._nodes.has(sourceId) || !this._index._nodes.has(targetId)) {
       return null;
@@ -95,7 +153,7 @@ export class GraphTraversal {
       }
 
       // Get children with type filtering
-      const children = this._getTraversableChildren(current, nodeType, edgeType);
+      const children = this._getTraversableChildren(current, nodeTypes, edgeTypes);
       for (const childId of children) {
         if (!visited.has(childId)) {
           visited.add(childId);
