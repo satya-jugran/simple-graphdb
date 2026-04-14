@@ -204,16 +204,17 @@ export class Graph {
 
   /**
    * Traverses the graph from source to target using the specified algorithm.
-   * @param sourceId - Id of the source node
-   * @param targetId - Id of the target node
-   * @param options - Traversal options including method, nodeType, and edgeType filters
-   * @returns Array of node ids from source to target if path exists, null otherwise
+   * Supports wildcards: '*' or array of ids for source/target to find multiple paths.
+   * @param sourceId - Id of the source node (or '*' for all nodes, or array of ids)
+   * @param targetId - Id of the target node (or '*' for all nodes, or array of ids)
+   * @param options - Traversal options including method, nodeTypes, and edgeTypes filters
+   * @returns Array of paths (each path is array of node ids), or null if no paths found
    */
   traverse(
-    sourceId: string,
-    targetId: string,
+    sourceId: string | string[],
+    targetId: string | string[],
     options: TraversalOptions = {}
-  ): string[] | null {
+  ): string[][] | null {
     return this._traversal.traverse(sourceId, targetId, options);
   }
 

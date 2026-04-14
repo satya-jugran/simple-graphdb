@@ -129,63 +129,63 @@ describe('Complex Graph from JSON', () => {
     it('should find path from Alice to Grace via Bob', () => {
       const alice = graph.getNodes().find(n => n.properties.name === 'Alice');
       const grace = graph.getNodes().find(n => n.properties.name === 'Grace');
-      const path = graph.traverse(alice!.id, grace!.id, { method: 'bfs' });
-      expect(path).toBeDefined();
-      expect(path).toContain(alice!.id);
-      expect(path).toContain(grace!.id);
+      const paths = graph.traverse(alice!.id, grace!.id, { method: 'bfs' });
+      expect(paths).not.toBeNull();
+      expect(paths![0]).toContain(alice!.id);
+      expect(paths![0]).toContain(grace!.id);
     });
 
     it('should find path from Charlie to Henry via Eve', () => {
       const charlie = graph.getNodes().find(n => n.properties.name === 'Charlie');
       const henry = graph.getNodes().find(n => n.properties.name === 'Henry');
-      const path = graph.traverse(charlie!.id, henry!.id, { method: 'bfs' });
-      expect(path).toBeDefined();
-      expect(path).toContain(charlie!.id);
-      expect(path).toContain(henry!.id);
+      const paths = graph.traverse(charlie!.id, henry!.id, { method: 'bfs' });
+      expect(paths).not.toBeNull();
+      expect(paths![0]).toContain(charlie!.id);
+      expect(paths![0]).toContain(henry!.id);
     });
 
     it('should handle cycle without infinite loop', () => {
       const alice = graph.getNodes().find(n => n.properties.name === 'Alice');
       const david = graph.getNodes().find(n => n.properties.name === 'David');
-      const path = graph.traverse(alice!.id, david!.id, { method: 'bfs' });
-      expect(path).toBeDefined();
+      const paths = graph.traverse(alice!.id, david!.id, { method: 'bfs' });
+      expect(paths).not.toBeNull();
     });
 
     it('should return null when no path exists', () => {
       const grace = graph.getNodes().find(n => n.properties.name === 'Grace');
       const alice = graph.getNodes().find(n => n.properties.name === 'Alice');
       // Grace has no outgoing edges, so cannot reach Alice
-      const path = graph.traverse(grace!.id, alice!.id, { method: 'bfs' });
-      expect(path).toBeNull();
+      const paths = graph.traverse(grace!.id, alice!.id, { method: 'bfs' });
+      expect(paths).toBeNull();
     });
 
     it('should return [source] when source equals target', () => {
       const alice = graph.getNodes().find(n => n.properties.name === 'Alice');
-      const path = graph.traverse(alice!.id, alice!.id, { method: 'bfs' });
-      expect(path).toEqual([alice!.id]);
+      const paths = graph.traverse(alice!.id, alice!.id, { method: 'bfs' });
+      expect(paths).toEqual([[alice!.id]]);
     });
 
     it('should find direct neighbor path', () => {
       const alice = graph.getNodes().find(n => n.properties.name === 'Alice');
       const bob = graph.getNodes().find(n => n.properties.name === 'Bob');
-      const path = graph.traverse(alice!.id, bob!.id, { method: 'bfs' });
-      expect(path).toEqual([alice!.id, bob!.id]);
+      const paths = graph.traverse(alice!.id, bob!.id, { method: 'bfs' });
+      expect(paths).toEqual([[alice!.id, bob!.id]]);
     });
 
     it('should find multi-hop path with DFS', () => {
       const alice = graph.getNodes().find(n => n.properties.name === 'Alice');
       const grace = graph.getNodes().find(n => n.properties.name === 'Grace');
-      const path = graph.traverse(alice!.id, grace!.id, { method: 'dfs' });
-      expect(path).toBeDefined();
-      expect(path).toContain(alice!.id);
-      expect(path).toContain(grace!.id);
+      const paths = graph.traverse(alice!.id, grace!.id, { method: 'dfs' });
+      expect(paths).not.toBeNull();
+      expect(paths![0]).toContain(alice!.id);
+      expect(paths![0]).toContain(grace!.id);
     });
 
     it('should default to BFS', () => {
       const alice = graph.getNodes().find(n => n.properties.name === 'Alice');
       const bob = graph.getNodes().find(n => n.properties.name === 'Bob');
-      const path = graph.traverse(alice!.id, bob!.id);
-      expect(path).toEqual([alice!.id, bob!.id]);
+      const paths = graph.traverse(alice!.id, bob!.id);
+      expect(paths).toEqual([[alice!.id, bob!.id]]);
     });
 
     it('should return null for non-existent source', () => {

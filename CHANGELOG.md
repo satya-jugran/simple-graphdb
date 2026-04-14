@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2026-04-14
+
+### 🚨 Breaking Changes
+
+1. **TraversalOptions API Updated**
+   - `nodeType` renamed to `nodeTypes` (array instead of single string)
+   - `edgeType` renamed to `edgeTypes` (array instead of single string)
+   - Default value changed from `'*'` to `['*']` (wildcard array means include all)
+
+2. **traverse() Return Type Changed**
+   - Old: `string[] | null` (single path)
+   - New: `string[][] | null` (array of paths)
+   - Source and target now accept wildcards: `string | string[]`
+
+### ✨ New Features
+
+1. **Wildcard Traversal**
+   - `traverse('*', target)` - find all paths to target
+   - `traverse(source, '*')` - find all paths from source
+   - `traverse('*', '*')` - find all paths in graph
+   - `traverse(['a', 'b'], ['x', 'y'])` - find all paths between multiple nodes
+
+2. **Multi-Type Filtering**
+   - `nodeTypes: ['TypeA', 'TypeB']` - match nodes of type A OR B
+   - `edgeTypes: ['EDGE1', 'EDGE2']` - match edges of type 1 OR 2
+   - Wildcard `'*'` in array means include all types
+
+---
+
 ## [2.1.0] - 2026-04-12
 
 ### 🚀 Performance Improvements
