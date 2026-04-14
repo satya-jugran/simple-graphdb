@@ -405,7 +405,7 @@ describe('Education Graph', () => {
       expect(pathWrongNode).toBeNull();
     });
 
-    it('should find all authors of python-course using wildcard target', () => {
+    it('should find all authors of python-course using wildcard source', () => {
       const pythonCourse = graph.getNodes().find(n => n.properties.name === 'Python');
       
       const paths = graph.traverse('*', pythonCourse!.id, {

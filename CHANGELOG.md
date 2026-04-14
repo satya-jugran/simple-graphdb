@@ -22,10 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### ✨ New Features
 
 1. **Wildcard Traversal**
-   - `traverse('*', target)` - find all paths to target
-   - `traverse(source, '*')` - find all paths from source
-   - `traverse('*', '*')` - find all paths in graph
-   - `traverse(['a', 'b'], ['x', 'y'])` - find all paths between multiple nodes
+   - `traverse('*', target)` - find one path for each matching source to target
+   - `traverse(source, '*')` - find one path from source to each matching target
+   - `traverse('*', '*')` - find one path for each matching source/target combination
+   - `traverse(['a', 'b'], ['x', 'y'])` - find one path for each matching source/target pair between the provided node sets
 
 2. **Multi-Type Filtering**
    - `nodeTypes: ['TypeA', 'TypeB']` - match nodes of type A OR B
