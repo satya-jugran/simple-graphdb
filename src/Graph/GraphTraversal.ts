@@ -49,14 +49,14 @@ export class GraphTraversal {
 
   /**
    * Normalizes source/target input to an array of node IDs.
-   * '*' expands to all node IDs in the graph.
+   * '*', [], and ['*'] all expand to all node IDs in the graph.
    * @param input - Single ID, '*', or array of IDs
    * @returns Array of node IDs
    */
   private _normalizeToNodeIds(input: string | string[]): string[] {
     if (Array.isArray(input)) {
-      if (input.length === 0) {
-        return ['*'];  // Empty array treated as wildcard
+      if (input.length === 0 || input.includes('*')) {
+        return Array.from(this._index._nodes.keys());  // Expand to all nodes
       }
       return input;
     }
