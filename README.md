@@ -94,7 +94,7 @@ graph.isDAG(); // true
 
 | Method | Description |
 |--------|-------------|
-| `traverse(sourceId: string \| string[], targetId: string \| string[], options?: TraversalOptions): string[][] \| null` | Find all paths with optional `method`, `nodeTypes`, and `edgeTypes` filters |
+| `traverse(sourceId: string \| string[], targetId: string \| string[], options?: TraversalOptions): string[][] \| null` | Find path(s) between the given source and target node(s), using the selected `method` and optional `nodeTypes` and `edgeTypes` filters |
 | `isDAG(): boolean` | Check if graph is a Directed Acyclic Graph |
 | `topologicalSort(): string[] \| null` | Get nodes in topological order (DAGs only); returns null if cycles exist |
 
@@ -113,16 +113,16 @@ interface TraversalOptions {
 The `traverse()` method supports wildcards for flexible path finding:
 
 ```typescript
-// Find all paths to a specific target
+// Find a path to a specific target from each matching source
 graph.traverse('*', targetId);
 
-// Find all paths from a specific source
+// Find a path from a specific source to each reachable target
 graph.traverse(sourceId, '*');
 
-// Find all paths in the graph
+// Find a representative path for each matching source/target pair in the graph
 graph.traverse('*', '*');
 
-// Find paths between multiple sources and targets
+// Find a path for each matching source/target combination
 graph.traverse(['id1', 'id2'], ['id3', 'id4']);
 ```
 
