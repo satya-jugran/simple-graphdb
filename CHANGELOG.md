@@ -32,6 +32,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    - `edgeTypes: ['EDGE1', 'EDGE2']` - match edges of type 1 OR 2
    - Wildcard `'*'` in array means include all types
 
+3. **maxResults Option**
+   - `maxResults: number` - limit number of paths returned during wildcard traversal (default: 100)
+   - Useful for large graphs where only first N paths are needed
+   - Paths are returned in source→target order until limit is reached
+
 ---
 
 ## [2.1.0] - 2026-04-12

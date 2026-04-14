@@ -105,6 +105,7 @@ interface TraversalOptions {
   method?: 'bfs' | 'dfs';           // default: 'bfs'
   nodeTypes?: string[];              // filter by node types (['*'] = all, default)
   edgeTypes?: string[];              // filter by edge types (['*'] = all, default)
+  maxResults?: number;              // limit number of paths returned (default: 100)
 }
 ```
 

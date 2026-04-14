@@ -83,13 +83,20 @@ export class GraphTraversal {
     const targets = this._normalizeToNodeIds(targetId);
 
     const allPaths: string[][] = [];
+    const maxResults = options.maxResults ?? 100;
 
     for (const src of sources) {
       for (const tgt of targets) {
         const path = this._traverseSingle(src, tgt, options);
         if (path !== null) {
           allPaths.push(path);
+          if (maxResults && allPaths.length >= maxResults) {
+            break;
+          }
         }
+      }
+      if (maxResults && allPaths.length >= maxResults) {
+        break;
       }
     }
 
