@@ -33,7 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
      ```
 ### 🧪 Test Coverage
 
-- **SocialGraph.test.ts** - 42 tests (Facebook-style social graph with People, Posts, Photos, Comments)
+- **SocialGraph.test.ts** - 76 tests (Facebook-style social graph with People, Posts, Photos, Comments)
 
 ---
 
