@@ -884,11 +884,6 @@ describe('Facebook Social Graph', () => {
       expect(node).toBeUndefined();
     });
 
-    it('should return undefined for non-existent node', () => {
-      const node = graph.getNode('non-existent-id');
-      expect(node).toBeUndefined();
-    });
-
     it('should return undefined for non-existent edge', () => {
       const edge = graph.getEdge('non-existent-edge-id');
       expect(edge).toBeUndefined();

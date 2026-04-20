@@ -27,6 +27,7 @@ export interface MermaidOptions {
 export class GraphToMermaid {
   private readonly _graphData: GraphData;
   private readonly _options: Required<MermaidOptions>;
+  private readonly _usedIds: Set<string> = new Set();
 
   /**
    * Creates a new GraphToMermaid converter from a Graph instance.
@@ -168,12 +169,24 @@ export class GraphToMermaid {
   /**
    * Sanitizes an ID for use in Mermaid syntax.
    * Mermaid IDs must be alphanumeric and may contain hyphens and underscores.
+   * Handles collisions by appending a numeric suffix.
    * @param id - The original node/edge id
-   * @returns Sanitized id safe for Mermaid
+   * @returns Sanitized id safe for Mermaid, with collision handling
    */
   private _sanitizeId(id: string): string {
     // Replace any non-alphanumeric characters (except hyphen and underscore) with underscores
-    return id.replace(/[^a-zA-Z0-9_-]/g, '_');
+    let sanitized = id.replace(/[^a-zA-Z0-9_-]/g, '_');
+    
+    // Handle collisions by appending a numeric suffix
+    let finalId = sanitized;
+    let counter = 0;
+    while (this._usedIds.has(finalId)) {
+      counter++;
+      finalId = `${sanitized}_${counter}`;
+    }
+    
+    this._usedIds.add(finalId);
+    return finalId;
   }
 
   /**

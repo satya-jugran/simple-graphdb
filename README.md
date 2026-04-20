@@ -310,7 +310,7 @@ The test suite includes:
   - `Graph.topologicalSort.test.ts` - Topological ordering (10 tests)
   - `Graph.fromJSON.test.ts` - JSON validation (6 tests)
   - `Graph.clear.test.ts` - Graph clearing (1 test)
-- `tests/SocialGraph.test.ts` - Facebook-style social graph with People, Posts, Photos, Comments (76 tests)
+- `tests/SocialGraph.test.ts` - Facebook-style social graph with People, Posts, Photos, Comments (75 tests)
 - `tests/EducationGraph.test.ts` - Education domain graph tests (37 tests)
 - `tests/data/education-graph.json` - Education domain graph with Courses, Chapters, Sections, Exams, Tests, Authors, Publishers, and Tags
 
