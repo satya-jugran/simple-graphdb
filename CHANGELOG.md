@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.0] - 2026-04-18
+
+### ✨ New Features
+
+1. **GraphToMermaid - Mermaid Diagram Generation**
+   - New `GraphToMermaid` class to convert graph data to Mermaid flowchart syntax
+   - Supports both `Graph` instances and JSON serialized data
+   - Configurable options: `showProperties`, `includeEdgeLabels`, `direction`
+   - Generates `flowchart TD` or `flowchart LR` directed graphs
+   - Node labels show type and id; edges show relationship types
+   - Example usage:
+     ```typescript
+     import { Graph, GraphToMermaid } from 'simple-graphdb';
+     
+     const graph = new Graph();
+     const alice = graph.addNode('Person', { name: 'Alice' });
+     const bob = graph.addNode('Person', { name: 'Bob' });
+     graph.addEdge(alice.id, bob.id, 'KNOWS');
+     
+     const mermaid = new GraphToMermaid(graph);
+     console.log(mermaid.toString());
+     // flowchart TD
+     //     abc123["Person | abc123"]
+     //     def456["Person | def456"]
+     //     abc123 -->|"KNOWS"| def456
+     ```
+### 🧪 Test Coverage
+
+- **SocialGraph.test.ts** - 42 tests (Facebook-style social graph with People, Posts, Photos, Comments)
+
+---
+
 ## [3.0.0] - 2026-04-14
 
 ### 🚨 Breaking Changes
