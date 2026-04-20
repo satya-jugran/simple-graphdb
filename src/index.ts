@@ -18,4 +18,5 @@ export {
   EdgeAlreadyExistsError,
   NodeNotFoundError,
   EdgeNotFoundError,
+  InvalidGraphDataError,
 } from './errors';

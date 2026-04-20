@@ -1,5 +1,6 @@
 import type { GraphData, NodeData, EdgeData } from '../types';
 import { Graph } from '../Graph';
+import { InvalidGraphDataError } from '../errors';
 
 /**
  * Options for Mermaid diagram generation.
@@ -43,7 +44,16 @@ export class GraphToMermaid {
 
   constructor(graphOrJson: Graph | string, options?: MermaidOptions) {
     if (typeof graphOrJson === 'string') {
-      this._graphData = JSON.parse(graphOrJson) as GraphData;
+      try {
+        const parsed = JSON.parse(graphOrJson);
+        this._validateGraphData(parsed);
+        this._graphData = parsed;
+      } catch (e) {
+        if (e instanceof SyntaxError) {
+          throw new InvalidGraphDataError(`Invalid JSON: ${e.message}`);
+        }
+        throw e;
+      }
     } else {
       this._graphData = graphOrJson.toJSON();
     }
@@ -53,6 +63,21 @@ export class GraphToMermaid {
       includeEdgeLabels: options?.includeEdgeLabels ?? true,
       direction: options?.direction ?? 'TD',
     };
+  }
+
+  /**
+   * Validates that the parsed data has the required GraphData structure.
+   */
+  private _validateGraphData(data: unknown): asserts data is GraphData {
+    if (typeof data !== 'object' || data === null) {
+      throw new InvalidGraphDataError('GraphData must be an object');
+    }
+    if (!Array.isArray((data as GraphData).nodes)) {
+      throw new InvalidGraphDataError('GraphData must have a nodes array');
+    }
+    if (!Array.isArray((data as GraphData).edges)) {
+      throw new InvalidGraphDataError('GraphData must have an edges array');
+    }
   }
 
   /**
@@ -95,12 +120,15 @@ export class GraphToMermaid {
    * @returns Label string in Mermaid format
    */
   private _buildNodeLabel(node: NodeData): string {
-    const parts: string[] = [node.type, node.id];
+    const parts: string[] = [
+      this._escapeMermaidText(node.type),
+      this._escapeMermaidText(node.id),
+    ];
 
     if (this._options.showProperties && Object.keys(node.properties).length > 0) {
       const props = Object.entries(node.properties)
         .slice(0, 3) // Limit to first 3 properties to avoid overly long labels
-        .map(([k, v]) => `${k}: ${this._truncateValue(v)}`)
+        .map(([k, v]) => `${this._escapeMermaidText(k)}: ${this._escapeMermaidText(this._truncateValue(v))}`)
         .join(', ');
       parts.push(`{${props}}`);
     }
@@ -118,10 +146,23 @@ export class GraphToMermaid {
     const targetSafe = this._sanitizeId(edge.targetId);
 
     if (this._options.includeEdgeLabels && edge.type) {
-      return `    ${sourceSafe} -->|"${edge.type}"| ${targetSafe}`;
+      return `    ${sourceSafe} -->|"${this._escapeMermaidText(edge.type)}"| ${targetSafe}`;
     }
 
     return `    ${sourceSafe} --> ${targetSafe}`;
+  }
+
+  /**
+   * Escapes Mermaid-significant characters in text to prevent injection.
+   * @param text - The text to escape
+   * @returns Escaped text safe for use in Mermaid labels
+   */
+  private _escapeMermaidText(text: string): string {
+    return text
+      .replace(/\\/g, '\\\\')  // Escape backslashes first
+      .replace(/"/g, '\\"')   // Escape double quotes
+      .replace(/\n/g, '\\n')   // Escape newlines
+      .replace(/]/g, '\\]');   // Escape closing brackets
   }
 
   /**
