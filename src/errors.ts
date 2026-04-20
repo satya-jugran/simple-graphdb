@@ -52,3 +52,14 @@ export class EdgeNotFoundError extends GraphError {
     Object.setPrototypeOf(this, EdgeNotFoundError.prototype);
   }
 }
+
+/**
+ * Error thrown when GraphData is invalid (malformed JSON or missing required fields)
+ */
+export class InvalidGraphDataError extends GraphError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'InvalidGraphDataError';
+    Object.setPrototypeOf(this, InvalidGraphDataError.prototype);
+  }
+}

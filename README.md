@@ -135,6 +135,63 @@ graph.traverse(['id1', 'id2'], ['id3', 'id4']);
 | `static fromJSON(data: GraphData): Graph` | Reconstruct graph from data |
 | `clear(): void` | Remove all nodes and edges |
 
+### GraphToMermaid - Mermaid Diagram Generation
+
+Convert your graph to Mermaid flowchart syntax for visualization:
+
+```typescript
+import { Graph, GraphToMermaid } from 'simple-graphdb';
+
+// Create a simple social graph
+const graph = new Graph();
+const alice = graph.addNode('Person', { name: 'Alice' });
+const bob = graph.addNode('Person', { name: 'Bob' });
+const carol = graph.addNode('Person', { name: 'Carol' });
+
+graph.addEdge(alice.id, bob.id, 'KNOWS');
+graph.addEdge(bob.id, carol.id, 'KNOWS');
+graph.addEdge(alice.id, carol.id, 'FRIEND_OF');
+
+// Generate Mermaid diagram
+const mermaid = new GraphToMermaid(graph);
+console.log(mermaid.toString());
+```
+
+Output:
+```mermaid
+flowchart TD
+    abc123["Person | abc123"]
+    def456["Person | def456"]
+    ghi789["Person | ghi789"]
+    abc123 -->|"KNOWS"| def456
+    def456 -->|"KNOWS"| ghi789
+    abc123 -->|"FRIEND_OF"| ghi789
+```
+
+#### GraphToMermaid Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `showProperties` | `boolean` | `false` | Include node properties in labels |
+| `includeEdgeLabels` | `boolean` | `true` | Show edge types on arrows |
+| `direction` | `'TD' \\| 'LR'` | `'TD'` | Flowchart direction (top-down or left-right) |
+
+```typescript
+// With custom options
+const mermaid = new GraphToMermaid(graph, {
+  showProperties: true,
+  includeEdgeLabels: true,
+  direction: 'LR'  // left-to-right layout
+});
+```
+
+You can also create GraphToMermaid from JSON data:
+
+```typescript
+const jsonData = graph.toJSON();
+const mermaid = new GraphToMermaid(JSON.stringify(jsonData));
+```
+
 ### Node Class
 
 ```typescript
@@ -253,9 +310,8 @@ The test suite includes:
   - `Graph.topologicalSort.test.ts` - Topological ordering (10 tests)
   - `Graph.fromJSON.test.ts` - JSON validation (6 tests)
   - `Graph.clear.test.ts` - Graph clearing (1 test)
-- `tests/ComplexGraph.test.ts` - Complex graph loaded from JSON (12 tests)
+- `tests/SocialGraph.test.ts` - Facebook-style social graph with People, Posts, Photos, Comments (75 tests)
 - `tests/EducationGraph.test.ts` - Education domain graph tests (37 tests)
-- `tests/data/complex-graph.json` - Sample graph data with 8 Person nodes
 - `tests/data/education-graph.json` - Education domain graph with Courses, Chapters, Sections, Exams, Tests, Authors, Publishers, and Tags
 
 ## License
