@@ -7,6 +7,10 @@ module.exports = {
   moduleFileExtensions: ['ts', 'js', 'json'],
   collectCoverageFrom: ['src/**/*.ts'],
   coveragePathIgnorePatterns: ['/node_modules/', '/dist/'],
+  "coverageReporters": [
+    "lcov",
+    "json-summary"
+  ],
   transform: {
     '^.+\\.tsx?$': ['ts-jest', { tsconfig: { resolveJsonModule: true } }],
   },
