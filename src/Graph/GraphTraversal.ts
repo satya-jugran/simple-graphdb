@@ -128,18 +128,17 @@ export class GraphTraversal {
     const visited = new Set<string>();
     const parent = new Map<string, string | null>();
 
-    // Use index-based queue for BFS to avoid O(n) shift()
-    const queue: string[] = [sourceId];
-    const stack: string[] = [sourceId];
-    let queueIndex = 0;
+    // Single frontier structure: index-based array used as queue (BFS) or stack (DFS)
+    const frontier: string[] = [sourceId];
+    let queueIndex = 0; // only used for BFS
 
     parent.set(sourceId, null);
     visited.add(sourceId);
 
-    while (method === 'bfs' ? queueIndex < queue.length : stack.length > 0) {
+    while (method === 'bfs' ? queueIndex < frontier.length : frontier.length > 0) {
       const current = method === 'bfs'
-        ? queue[queueIndex++]
-        : stack.pop()!;
+        ? frontier[queueIndex++]   // BFS: dequeue from front via index
+        : frontier.pop()!;         // DFS: pop from back (LIFO)
 
       if (current === targetId) {
         // Reconstruct path
@@ -158,11 +157,7 @@ export class GraphTraversal {
         if (!visited.has(childId)) {
           visited.add(childId);
           parent.set(childId, current);
-          if (method === 'bfs') {
-            queue.push(childId);
-          } else {
-            stack.push(childId);
-          }
+          frontier.push(childId);
         }
       }
     }
