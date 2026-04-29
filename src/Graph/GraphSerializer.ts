@@ -24,13 +24,15 @@ export class GraphSerializer {
    * @returns GraphData representation
    */
   toJSON(): GraphData {
-    const nodesArray = Array.from(this._index._nodes.values());
-    const edgesArray = Array.from(this._index._edges.values());
+    const nodeMap = this._index._getNodeMap();
+    const edgeMap = this._index._getEdgeMap();
+
+    const nodesArray = Array.from(nodeMap.values());
+    const edgesArray = Array.from(edgeMap.values());
 
     // For DAGs, use topological order for consistent serialization
     const topoOrder = this._traversal.topologicalSort();
     if (topoOrder) {
-      const nodeMap = new Map(nodesArray.map(n => [n.id, n]));
       const sortedNodes = topoOrder
         .map(id => nodeMap.get(id))
         .filter((n): n is Node => n !== undefined)
@@ -50,38 +52,34 @@ export class GraphSerializer {
   }
 
   /**
-   * Creates a new Graph instance from serialized data.
+   * Populates the graph index from serialized data.
    * @param data - GraphData to reconstruct from
-   * @returns Object with index containing all nodes and edges
    * @throws NodeAlreadyExistsError if a node id is duplicated
    * @throws EdgeAlreadyExistsError if an edge id is duplicated
    * @throws NodeNotFoundError if an edge references a non-existent node
    */
   fromJSON(data: GraphData): void {
+    const nodeMap = this._index._getNodeMap();
+    const edgeMap = this._index._getEdgeMap();
+
     // Add all nodes first with validation
     for (const nodeData of data.nodes) {
-      if (this._index._nodes.has(nodeData.id)) {
+      if (nodeMap.has(nodeData.id)) {
         throw new NodeAlreadyExistsError(nodeData.id);
       }
       const node = new Node(nodeData.type, nodeData.properties, nodeData.id);
-      this._index._nodes.set(node.id, node);
-
-      // Update type index
-      if (!this._index._nodesByType.has(nodeData.type)) {
-        this._index._nodesByType.set(nodeData.type, new Set());
-      }
-      this._index._nodesByType.get(nodeData.type)!.add(node.id);
+      this._index._insertNode(node);
     }
 
     // Then add all edges with validation
     for (const edgeData of data.edges) {
-      if (this._index._edges.has(edgeData.id)) {
+      if (edgeMap.has(edgeData.id)) {
         throw new EdgeAlreadyExistsError(edgeData.id);
       }
-      if (!this._index._nodes.has(edgeData.sourceId)) {
+      if (!nodeMap.has(edgeData.sourceId)) {
         throw new NodeNotFoundError(edgeData.sourceId);
       }
-      if (!this._index._nodes.has(edgeData.targetId)) {
+      if (!nodeMap.has(edgeData.targetId)) {
         throw new NodeNotFoundError(edgeData.targetId);
       }
       const edge = new Edge(
@@ -91,24 +89,7 @@ export class GraphSerializer {
         edgeData.properties,
         edgeData.id
       );
-      this._index._edges.set(edge.id, edge);
-
-      // Update adjacency maps
-      if (!this._index._edgesBySource.has(edgeData.sourceId)) {
-        this._index._edgesBySource.set(edgeData.sourceId, new Set());
-      }
-      this._index._edgesBySource.get(edgeData.sourceId)!.add(edge.id);
-
-      if (!this._index._edgesByTarget.has(edgeData.targetId)) {
-        this._index._edgesByTarget.set(edgeData.targetId, new Set());
-      }
-      this._index._edgesByTarget.get(edgeData.targetId)!.add(edge.id);
-
-      // Update type index
-      if (!this._index._edgesByType.has(edgeData.type)) {
-        this._index._edgesByType.set(edgeData.type, new Set());
-      }
-      this._index._edgesByType.get(edgeData.type)!.add(edge.id);
+      this._index._insertEdge(edge);
     }
   }
 }

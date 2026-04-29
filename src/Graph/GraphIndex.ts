@@ -11,16 +11,73 @@ import {
  * Handles all index maps for O(1) lookups and provides data access methods.
  */
 export class GraphIndex {
-  readonly _nodes: Map<string, Node> = new Map();
-  readonly _edges: Map<string, Edge> = new Map();
+  private readonly _nodes: Map<string, Node> = new Map();
+  private readonly _edges: Map<string, Edge> = new Map();
 
   // Type index maps for O(1) type-based queries
-  readonly _nodesByType: Map<string, Set<string>> = new Map();
-  readonly _edgesByType: Map<string, Set<string>> = new Map();
+  private readonly _nodesByType: Map<string, Set<string>> = new Map();
+  private readonly _edgesByType: Map<string, Set<string>> = new Map();
 
   // Adjacency maps for O(1) edge lookups
-  readonly _edgesBySource: Map<string, Set<string>> = new Map();
-  readonly _edgesByTarget: Map<string, Set<string>> = new Map();
+  private readonly _edgesBySource: Map<string, Set<string>> = new Map();
+  private readonly _edgesByTarget: Map<string, Set<string>> = new Map();
+
+  // -------------------------------------------------------------------------
+  // Package-internal read accessors (used by GraphTraversal / GraphSerializer)
+  // -------------------------------------------------------------------------
+
+  /** @internal Returns the raw node map (read-only view). */
+  _getNodeMap(): ReadonlyMap<string, Node> {
+    return this._nodes;
+  }
+
+  /** @internal Returns the raw edge map (read-only view). */
+  _getEdgeMap(): ReadonlyMap<string, Edge> {
+    return this._edges;
+  }
+
+  /** @internal Returns outgoing edge-id set for a node (read-only view). */
+  _getEdgesBySource(nodeId: string): ReadonlySet<string> {
+    return this._edgesBySource.get(nodeId) ?? new Set();
+  }
+
+  /** @internal Returns incoming edge-id set for a node (read-only view). */
+  _getEdgesByTarget(nodeId: string): ReadonlySet<string> {
+    return this._edgesByTarget.get(nodeId) ?? new Set();
+  }
+
+  /** @internal Directly inserts a pre-constructed Node and updates all indexes (used by deserialization). */
+  _insertNode(node: Node): void {
+    this._nodes.set(node.id, node);
+    if (!this._nodesByType.has(node.type)) {
+      this._nodesByType.set(node.type, new Set());
+    }
+    this._nodesByType.get(node.type)!.add(node.id);
+  }
+
+  /** @internal Directly inserts a pre-constructed Edge and updates all indexes (used by deserialization). */
+  _insertEdge(edge: Edge): void {
+    this._edges.set(edge.id, edge);
+
+    if (!this._edgesBySource.has(edge.sourceId)) {
+      this._edgesBySource.set(edge.sourceId, new Set());
+    }
+    this._edgesBySource.get(edge.sourceId)!.add(edge.id);
+
+    if (!this._edgesByTarget.has(edge.targetId)) {
+      this._edgesByTarget.set(edge.targetId, new Set());
+    }
+    this._edgesByTarget.get(edge.targetId)!.add(edge.id);
+
+    if (!this._edgesByType.has(edge.type)) {
+      this._edgesByType.set(edge.type, new Set());
+    }
+    this._edgesByType.get(edge.type)!.add(edge.id);
+  }
+
+  // -------------------------------------------------------------------------
+  // Public API
+  // -------------------------------------------------------------------------
 
   /**
    * Returns all nodes in the graph.
@@ -92,10 +149,10 @@ export class GraphIndex {
       const outgoingEdgeIds = this._edgesBySource.get(id) ?? new Set();
       const incomingEdgeIds = this._edgesByTarget.get(id) ?? new Set();
 
-      for (const edgeId of outgoingEdgeIds) {
+      for (const edgeId of [...outgoingEdgeIds]) {
         this._removeEdgeInternal(edgeId);
       }
-      for (const edgeId of incomingEdgeIds) {
+      for (const edgeId of [...incomingEdgeIds]) {
         this._removeEdgeInternal(edgeId);
       }
     } else {

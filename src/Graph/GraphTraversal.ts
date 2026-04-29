@@ -16,15 +16,14 @@ export class GraphTraversal {
    * @returns Array of child node ids that pass the type filters
    */
   _getTraversableChildren(nodeId: string, nodeTypes: string[] = ['*'], edgeTypes: string[] = ['*']): string[] {
-    const edgeIds = this._index._edgesBySource.get(nodeId);
-    if (!edgeIds) {
-      return [];
-    }
+    const edgeIds = this._index._getEdgesBySource(nodeId);
+    const edgeMap = this._index._getEdgeMap();
+    const nodeMap = this._index._getNodeMap();
 
     const children: string[] = [];
 
     for (const edgeId of edgeIds) {
-      const edge = this._index._edges.get(edgeId);
+      const edge = edgeMap.get(edgeId);
       if (!edge) continue;
 
       // Apply edge type filter - include all if array is empty, contains '*', or matches
@@ -34,7 +33,7 @@ export class GraphTraversal {
       }
 
       // Apply node type filter for target node
-      const targetNode = this._index._nodes.get(edge.targetId);
+      const targetNode = nodeMap.get(edge.targetId);
       if (!targetNode) continue;
       const shouldFilterNode = nodeTypes.length > 0 && !nodeTypes.includes('*');
       if (shouldFilterNode && !nodeTypes.includes(targetNode.type)) {
@@ -56,12 +55,12 @@ export class GraphTraversal {
   private _normalizeToNodeIds(input: string | string[]): string[] {
     if (Array.isArray(input)) {
       if (input.length === 0 || input.includes('*')) {
-        return Array.from(this._index._nodes.keys());  // Expand to all nodes
+        return Array.from(this._index._getNodeMap().keys());
       }
       return input;
     }
     if (input === '*') {
-      return Array.from(this._index._nodes.keys());
+      return Array.from(this._index._getNodeMap().keys());
     }
     return [input];
   }
@@ -116,8 +115,9 @@ export class GraphTraversal {
     options: TraversalOptions
   ): string[] | null {
     const { method = 'bfs', nodeTypes = ['*'], edgeTypes = ['*'] } = options;
+    const nodeMap = this._index._getNodeMap();
 
-    if (!this._index._nodes.has(sourceId) || !this._index._nodes.has(targetId)) {
+    if (!nodeMap.has(sourceId) || !nodeMap.has(targetId)) {
       return null;
     }
 
@@ -158,8 +158,11 @@ export class GraphTraversal {
         if (!visited.has(childId)) {
           visited.add(childId);
           parent.set(childId, current);
-          queue.push(childId);
-          stack.push(childId);
+          if (method === 'bfs') {
+            queue.push(childId);
+          } else {
+            stack.push(childId);
+          }
         }
       }
     }
@@ -198,7 +201,7 @@ export class GraphTraversal {
     };
 
     // Check all nodes
-    for (const node of this._index._nodes.values()) {
+    for (const node of this._index._getNodeMap().values()) {
       if (!visited.has(node.id)) {
         if (hasCycle(node.id)) {
           return false;
@@ -216,21 +219,24 @@ export class GraphTraversal {
    * @returns Array of node ids in topological order, or null if graph has cycles
    */
   topologicalSort(): string[] | null {
+    const nodeMap = this._index._getNodeMap();
+    const edgeMap = this._index._getEdgeMap();
+
     // Calculate in-degree for each node
     const inDegree = new Map<string, number>();
-    for (const node of this._index._nodes.values()) {
+    for (const node of nodeMap.values()) {
       inDegree.set(node.id, 0);
     }
 
     // Build adjacency list and calculate in-degrees
     const adjacency = new Map<string, string[]>();
-    for (const node of this._index._nodes.values()) {
+    for (const node of nodeMap.values()) {
       adjacency.set(node.id, []);
     }
 
-    for (const edge of this._index._edges.values()) {
+    for (const edge of edgeMap.values()) {
       // Skip edges with dangling endpoints (nodes removed without cascade)
-      if (!this._index._nodes.has(edge.sourceId) || !this._index._nodes.has(edge.targetId)) {
+      if (!nodeMap.has(edge.sourceId) || !nodeMap.has(edge.targetId)) {
         continue;
       }
       adjacency.get(edge.sourceId)!.push(edge.targetId);
@@ -263,7 +269,7 @@ export class GraphTraversal {
     }
 
     // If we didn't process all nodes, there's a cycle
-    if (result.length !== this._index._nodes.size) {
+    if (result.length !== nodeMap.size) {
       return null;
     }
 
