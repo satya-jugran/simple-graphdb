@@ -22,7 +22,7 @@ export class Graph {
   constructor() {
     this._index = new GraphIndex();
     this._traversal = new GraphTraversal(this._index);
-    this._serializer = new GraphSerializer(this._index, this._traversal);
+    this._serializer = new GraphSerializer(this._index);
   }
 
   /**

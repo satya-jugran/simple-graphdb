@@ -2,7 +2,6 @@ import type { GraphData } from '../types';
 import { Node } from '../Node';
 import { Edge } from '../Edge';
 import { GraphIndex } from './GraphIndex';
-import { GraphTraversal } from './GraphTraversal';
 import {
   NodeAlreadyExistsError,
   EdgeAlreadyExistsError,
@@ -13,41 +12,20 @@ import {
  * Internal class that handles graph serialization and deserialization.
  */
 export class GraphSerializer {
-  constructor(
-    private _index: GraphIndex,
-    private _traversal: GraphTraversal
-  ) {}
+  constructor(private _index: GraphIndex) {}
 
   /**
    * Serializes the graph to a plain object for JSON storage.
-   * For DAGs, nodes are serialized in topological order (dependencies first).
+   * Nodes and edges are serialized in stable insertion order.
    * @returns GraphData representation
    */
   toJSON(): GraphData {
     const nodeMap = this._index._getNodeMap();
     const edgeMap = this._index._getEdgeMap();
 
-    const nodesArray = Array.from(nodeMap.values());
-    const edgesArray = Array.from(edgeMap.values());
-
-    // For DAGs, use topological order for consistent serialization
-    const topoOrder = this._traversal.topologicalSort();
-    if (topoOrder) {
-      const sortedNodes = topoOrder
-        .map(id => nodeMap.get(id))
-        .filter((n): n is Node => n !== undefined)
-        .map(node => node.toJSON());
-
-      return {
-        nodes: sortedNodes,
-        edges: edgesArray.map(edge => edge.toJSON()),
-      };
-    }
-
-    // For non-DAGs (cycles), use default order
     return {
-      nodes: nodesArray.map(node => node.toJSON()),
-      edges: edgesArray.map(edge => edge.toJSON()),
+      nodes: Array.from(nodeMap.values()).map(node => node.toJSON()),
+      edges: Array.from(edgeMap.values()).map(edge => edge.toJSON()),
     };
   }
 

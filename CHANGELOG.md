@@ -5,6 +5,48 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.0] - 2026-04-29
+
+### 🔒 Internal Improvements
+
+> These are internal correctness, safety, and performance fixes with no changes to the public API.
+
+1. **Encapsulation — `GraphIndex` internal maps made private**
+   - All internal `Map` fields (`_nodes`, `_edges`, `_nodesByType`, etc.) are now `private`
+   - Controlled package-internal accessors (`_getNodeMap()`, `_getEdgeMap()`, `_getEdgesBySource()`, `_getEdgesByTarget()`, `_insertNode()`, `_insertEdge()`) expose only what `GraphTraversal` and `GraphSerializer` need
+   - Prevents external code from bypassing validation and corrupting graph state
+
+2. **Correctness — `removeNode(cascade: false)` now throws instead of leaving dangling edges**
+   - Previously, calling `removeNode(id)` on a node with incident edges silently removed the node but left orphaned edges in `_edges`
+   - Now throws `NodeHasEdgesError` (newly exported) if the node has any incident edges
+   - Use `removeNode(id, true)` to cascade-remove all incident edges along with the node
+
+3. **Correctness — DFS traversal fixed**
+   - `_traverseSingle()` previously populated both a `queue` and a `stack` on every call, causing DFS to behave identically to BFS
+   - Now uses a single `frontier` array operated as a queue (BFS) or stack (DFS) based on `method`
+
+4. **Performance — O(1) `getNodesByProperty()` via property value index**
+   - Added `_nodesByProperty: Map<key, Map<serializedValue, Set<nodeId>>>` index maintained on every `addNode`, `removeNode`, and `_insertNode`
+   - `getNodesByProperty()` is now O(1) instead of O(n)
+
+5. **Correctness — Deep-freeze on `Node` and `Edge` properties**
+   - Previously `Object.freeze()` was applied only at the top level of properties, leaving nested objects mutable
+   - New `deepFreeze()` utility recursively freezes all nested plain-object and array values
+
+6. **Correctness — `fromJSON()` no longer bypasses index validation**
+   - `GraphSerializer.fromJSON()` previously wrote directly into private maps, skipping source/target existence checks
+   - Now validates source/target node existence before inserting each edge
+
+7. **Performance — `toJSON()` no longer runs `topologicalSort()` unconditionally**
+   - Previously every `toJSON()` call triggered a full O(V+E) topological sort just to order the output
+   - Nodes are now serialized in stable insertion order; `_traversal` dependency removed from `GraphSerializer`
+
+### 🆕 New Exports
+
+- `NodeHasEdgesError` — thrown when `removeNode(id)` is called without `cascade` on a node that still has incident edges
+
+---
+
 ## [3.1.0] - 2026-04-18
 
 ### ✨ New Features

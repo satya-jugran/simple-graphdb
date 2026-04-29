@@ -219,7 +219,7 @@ edge.toJSON();   // { id: '...', sourceId: '...', targetId: '...', type: 'CONTAI
 ## Error Handling
 
 ```typescript
-import { Graph, NodeAlreadyExistsError, NodeNotFoundError, EdgeAlreadyExistsError } from 'simple-graphdb';
+import { Graph, NodeAlreadyExistsError, NodeNotFoundError, EdgeAlreadyExistsError, NodeHasEdgesError } from 'simple-graphdb';
 
 const graph = new Graph();
 const node = graph.addNode('Course', { name: 'Python' });
@@ -245,11 +245,29 @@ try {
 }
 ```
 
+```typescript
+const alice = graph.addNode('Person', { name: 'Alice' });
+const bob = graph.addNode('Person', { name: 'Bob' });
+graph.addEdge(alice.id, bob.id, 'KNOWS');
+
+try {
+  graph.removeNode(alice.id); // Throws NodeHasEdgesError — node still has incident edges
+} catch (e) {
+  if (e instanceof NodeHasEdgesError) {
+    console.log(e.message); // "Cannot remove node '...': it still has 1 incident edge(s). Use cascade=true to also remove them."
+  }
+}
+
+// To remove with all incident edges:
+graph.removeNode(alice.id, true); // cascade removes KNOWS edge too
+```
+
 Available errors:
 - `NodeAlreadyExistsError`
 - `EdgeAlreadyExistsError`
 - `NodeNotFoundError`
 - `EdgeNotFoundError`
+- `NodeHasEdgesError` — thrown by `removeNode(id)` when the node has incident edges and `cascade` is not `true`
 
 ## Serialization & Persistence
 
