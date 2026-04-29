@@ -1,6 +1,6 @@
 # simple-graphdb
 
-A lightweight in-memory graph database.
+A lightweight in-memory graph database for TypeScript with support for directed/undirected graphs, BFS/DFS traversal, topological sort, DAG detection, and Mermaid diagram export.
 
 ## Installation
 
