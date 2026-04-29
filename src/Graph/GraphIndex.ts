@@ -23,6 +23,9 @@ export class GraphIndex {
   private readonly _edgesBySource: Map<string, Set<string>> = new Map();
   private readonly _edgesByTarget: Map<string, Set<string>> = new Map();
 
+  // Property value index: propKey -> serializedValue -> Set<nodeId>
+  private readonly _nodesByProperty: Map<string, Map<string, Set<string>>> = new Map();
+
   // -------------------------------------------------------------------------
   // Package-internal read accessors (used by GraphTraversal / GraphSerializer)
   // -------------------------------------------------------------------------
@@ -47,6 +50,44 @@ export class GraphIndex {
     return this._edgesByTarget.get(nodeId) ?? new Set();
   }
 
+  /** @internal Serializes a property value to a stable string key for indexing. */
+  private _propKey(value: unknown): string {
+    return JSON.stringify(value) ?? 'undefined';
+  }
+
+  /** @internal Adds a node to the property value index for all its properties. */
+  private _indexNodeProperties(node: Node): void {
+    for (const [key, value] of Object.entries(node.properties)) {
+      const serialized = this._propKey(value);
+      if (!this._nodesByProperty.has(key)) {
+        this._nodesByProperty.set(key, new Map());
+      }
+      const valueMap = this._nodesByProperty.get(key)!;
+      if (!valueMap.has(serialized)) {
+        valueMap.set(serialized, new Set());
+      }
+      valueMap.get(serialized)!.add(node.id);
+    }
+  }
+
+  /** @internal Removes a node from the property value index for all its properties. */
+  private _unindexNodeProperties(node: Node): void {
+    for (const [key, value] of Object.entries(node.properties)) {
+      const serialized = this._propKey(value);
+      const valueMap = this._nodesByProperty.get(key);
+      if (!valueMap) continue;
+      const idSet = valueMap.get(serialized);
+      if (!idSet) continue;
+      idSet.delete(node.id);
+      if (idSet.size === 0) {
+        valueMap.delete(serialized);
+        if (valueMap.size === 0) {
+          this._nodesByProperty.delete(key);
+        }
+      }
+    }
+  }
+
   /** @internal Directly inserts a pre-constructed Node and updates all indexes (used by deserialization). */
   _insertNode(node: Node): void {
     this._nodes.set(node.id, node);
@@ -54,6 +95,7 @@ export class GraphIndex {
       this._nodesByType.set(node.type, new Set());
     }
     this._nodesByType.get(node.type)!.add(node.id);
+    this._indexNodeProperties(node);
   }
 
   /** @internal Directly inserts a pre-constructed Edge and updates all indexes (used by deserialization). */
@@ -130,6 +172,9 @@ export class GraphIndex {
     }
     this._nodesByType.get(type)!.add(node.id);
 
+    // Update property value index
+    this._indexNodeProperties(node);
+
     return node;
   }
 
@@ -172,6 +217,9 @@ export class GraphIndex {
         this._nodesByType.delete(node.type);
       }
     }
+
+    // Remove from property value index
+    this._unindexNodeProperties(node);
 
     this._nodes.delete(id);
     return true;
@@ -246,16 +294,18 @@ export class GraphIndex {
    */
   getNodesByProperty(key: string, value: unknown, options?: { nodeType?: string }): Node[] {
     const nodeType = options?.nodeType ?? '*';
+    const serialized = this._propKey(value);
 
-    return Array.from(this._nodes.values()).filter((node) => {
-      if (node.properties[key] !== value) {
-        return false;
-      }
-      if (nodeType !== '*' && node.type !== nodeType) {
-        return false;
-      }
-      return true;
-    });
+    const valueMap = this._nodesByProperty.get(key);
+    if (!valueMap) return [];
+
+    const nodeIds = valueMap.get(serialized);
+    if (!nodeIds) return [];
+
+    return Array.from(nodeIds)
+      .map((id) => this._nodes.get(id))
+      .filter((node): node is Node => node !== undefined)
+      .filter((node) => nodeType === '*' || node.type === nodeType);
   }
 
   /**
@@ -521,5 +571,6 @@ export class GraphIndex {
     this._edgesByType.clear();
     this._edgesBySource.clear();
     this._edgesByTarget.clear();
+    this._nodesByProperty.clear();
   }
 }
