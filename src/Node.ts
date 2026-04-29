@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import type { NodeData } from './types';
+import { deepFreeze } from './utils';
 
 /**
  * Represents a node in the graph database.
@@ -19,7 +20,7 @@ export class Node {
   constructor(type: string, properties: Record<string, unknown> = {}, id?: string) {
     this._id = id ?? randomUUID();
     this._type = type;
-    this._properties = Object.freeze({ ...properties });
+    this._properties = deepFreeze({ ...properties });
   }
 
   /**

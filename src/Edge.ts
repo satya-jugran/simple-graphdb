@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import type { EdgeData } from './types';
+import { deepFreeze } from './utils';
 
 /**
  * Represents a directed edge (relationship) in the graph database.
@@ -31,7 +32,7 @@ export class Edge {
     this._sourceId = sourceId;
     this._targetId = targetId;
     this._type = type;
-    this._properties = Object.freeze({ ...properties });
+    this._properties = deepFreeze({ ...properties });
   }
 
   /**
