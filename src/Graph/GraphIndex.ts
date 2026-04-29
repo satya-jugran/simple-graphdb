@@ -401,17 +401,17 @@ export class GraphIndex {
     for (const edgeId of edgeIds) {
       const edge = this._edges.get(edgeId);
       if (!edge) continue;
-      
+
       const sourceNode = this._nodes.get(edge.sourceId);
       if (!sourceNode) continue;
-      
+
       if (edgeType !== '*' && edge.type !== edgeType) {
         continue;
       }
       if (nodeType !== '*' && sourceNode.type !== nodeType) {
         continue;
       }
-      
+
       parentIds.add(edge.sourceId);
     }
 
@@ -441,17 +441,17 @@ export class GraphIndex {
     for (const edgeId of edgeIds) {
       const edge = this._edges.get(edgeId);
       if (!edge) continue;
-      
+
       const targetNode = this._nodes.get(edge.targetId);
       if (!targetNode) continue;
-      
+
       if (edgeType !== '*' && edge.type !== edgeType) {
         continue;
       }
       if (nodeType !== '*' && targetNode.type !== nodeType) {
         continue;
       }
-      
+
       childIds.add(edge.targetId);
     }
 
