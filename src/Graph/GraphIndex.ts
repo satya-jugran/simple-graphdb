@@ -4,6 +4,7 @@ import {
   NodeAlreadyExistsError,
   EdgeAlreadyExistsError,
   NodeNotFoundError,
+  NodeHasEdgesError,
 } from '../errors';
 
 /**
@@ -144,11 +145,11 @@ export class GraphIndex {
       return false;
     }
 
+    const outgoingEdgeIds = this._edgesBySource.get(id) ?? new Set();
+    const incomingEdgeIds = this._edgesByTarget.get(id) ?? new Set();
+
     if (cascade) {
       // Remove all edges incident to this node using adjacency maps
-      const outgoingEdgeIds = this._edgesBySource.get(id) ?? new Set();
-      const incomingEdgeIds = this._edgesByTarget.get(id) ?? new Set();
-
       for (const edgeId of [...outgoingEdgeIds]) {
         this._removeEdgeInternal(edgeId);
       }
@@ -156,9 +157,11 @@ export class GraphIndex {
         this._removeEdgeInternal(edgeId);
       }
     } else {
-      // Clean up adjacency maps for non-cascade removal
-      this._edgesBySource.delete(id);
-      this._edgesByTarget.delete(id);
+      // Guard: refuse to leave dangling edges in the edge map
+      const incidentCount = outgoingEdgeIds.size + incomingEdgeIds.size;
+      if (incidentCount > 0) {
+        throw new NodeHasEdgesError(id, incidentCount);
+      }
     }
 
     // Remove from type index

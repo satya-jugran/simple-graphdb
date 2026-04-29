@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
-import { Graph } from '../../src/index';
+import { Graph, NodeHasEdgesError } from '../../src/index';
 
 describe('Graph.Node Operations', () => {
   let graph: Graph;
@@ -66,15 +66,21 @@ describe('Graph.Node Operations', () => {
     expect(graph.hasEdge(edge2.id)).toBe(false);
   });
 
-  it('should not cascade remove edges by default', () => {
+  it('should throw NodeHasEdgesError when removing a connected node without cascade', () => {
     const alice = graph.addNode('Person', { name: 'Alice' });
     const bob = graph.addNode('Person', { name: 'Bob' });
-    const edge = graph.addEdge(alice.id, bob.id, 'KNOWS');
+    graph.addEdge(alice.id, bob.id, 'KNOWS');
 
-    graph.removeNode(alice.id);
+    expect(() => graph.removeNode(alice.id)).toThrow(NodeHasEdgesError);
+    // Node should still exist since removal was rejected
+    expect(graph.hasNode(alice.id)).toBe(true);
+  });
 
+  it('should remove a node without edges (no cascade needed)', () => {
+    const alice = graph.addNode('Person', { name: 'Alice' });
+
+    expect(graph.removeNode(alice.id)).toBe(true);
     expect(graph.hasNode(alice.id)).toBe(false);
-    expect(graph.hasEdge(edge.id)).toBe(true);
   });
 
   it('should get all nodes', () => {

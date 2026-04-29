@@ -113,7 +113,7 @@ describe('Graph.topologicalSort()', () => {
     expect(result).toContain(c.id);
   });
 
-  it('should skip dangling edges (removed endpoints without cascade)', () => {
+  it('should correctly sort after cascade-removing a middle node', () => {
     const a = graph.addNode('Test', { name: 'A' });
     const b = graph.addNode('Test', { name: 'B' });
     const c = graph.addNode('Test', { name: 'C' });
@@ -121,8 +121,8 @@ describe('Graph.topologicalSort()', () => {
     graph.addEdge(a.id, b.id, 'LINKS');
     graph.addEdge(b.id, c.id, 'LINKS');
 
-    // Remove B without cascade (edge becomes dangling)
-    graph.removeNode(b.id);
+    // Remove B with cascade — both incident edges are also removed
+    graph.removeNode(b.id, true);
 
     const result = graph.topologicalSort();
     expect(result).toHaveLength(2);
