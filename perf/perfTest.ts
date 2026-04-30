@@ -1,0 +1,93 @@
+#!/usr/bin/env node
+/**
+ * simple-graphdb Performance Test Runner
+ *
+ * Run with:
+ *   npx ts-node --project tsconfig.perf.json perf/perfTest.ts
+ *
+ * For accurate memory measurements, add --expose-gc:
+ *   node --expose-gc -r ts-node/register --project tsconfig.perf.json perf/perfTest.ts
+ */
+
+import { buildGraph } from './graphGenerator';
+import { runScenario, printReport, printScaleHeader, printSectionTitle } from './benchmarkRunner';
+import { buildScenarios } from './scenarios';
+
+// ─── Scale Definitions ────────────────────────────────────────────────────────
+
+interface ScaleConfig {
+  label: string;
+  nodeCount: number;
+  edgesPerNode: number;
+}
+
+const SCALES: ScaleConfig[] = [
+  { label: 'Small  (10k nodes)',  nodeCount: 10_000,  edgesPerNode: 3 },
+  { label: 'Medium (50k nodes)',  nodeCount: 50_000,  edgesPerNode: 3 },
+  { label: 'Large  (100k nodes)', nodeCount: 100_000, edgesPerNode: 3 },
+];
+
+// ─── Entry Point ──────────────────────────────────────────────────────────────
+
+async function main(): Promise<void> {
+  console.log('\n');
+  console.log('╔══════════════════════════════════════════════════════════════════════════════╗');
+  console.log('║            simple-graphdb  ·  Performance Test Suite                         ║');
+  console.log('║            Benchmarks: Write · Read · Navigation · Traversal                 ║');
+  console.log('║                        Analysis · Serialization · Mutation                   ║');
+  console.log('╚══════════════════════════════════════════════════════════════════════════════╝');
+
+  if (typeof global.gc !== 'function') {
+    console.log('\n  ⚠  TIP: Run with --expose-gc for more accurate heap measurements.');
+    console.log('     e.g.: node --expose-gc -r ts-node/register --project tsconfig.perf.json perf/perfTest.ts\n');
+  } else {
+    console.log('\n  ✓  GC available — heap measurements will be accurate.\n');
+  }
+
+  for (const scale of SCALES) {
+    printScaleHeader(scale.label);
+
+    // ── 1. Build the baseline graph (timed) ───────────────────────────────
+    printSectionTitle(`Building graph: ${scale.nodeCount.toLocaleString()} nodes @ ${scale.edgesPerNode} edges/node`);
+    const buildStart = process.hrtime.bigint();
+    const meta = buildGraph(scale.nodeCount, scale.edgesPerNode);
+    const buildMs = Number(process.hrtime.bigint() - buildStart) / 1_000_000;
+
+    console.log(`  ✓  Built: ${meta.nodeCount.toLocaleString()} nodes, ${meta.edgeCount.toLocaleString()} edges in ${buildMs.toFixed(0)} ms`);
+    console.log(`  ✓  DAG subgraph: ${meta.dagNodeIds.length.toLocaleString()} nodes`);
+    console.log(`  ✓  Heap footprint: ${formatBytes(meta.heapFootprintBytes)}`);
+
+    // ── 2. Run all benchmark scenarios ────────────────────────────────────
+    printSectionTitle('Running benchmark scenarios');
+
+    const scenarios = buildScenarios(scale.nodeCount);
+    const results = [];
+
+    for (const scenario of scenarios) {
+      process.stdout.write(`     ${scenario.category.padEnd(16)} ${scenario.name.padEnd(30)} `);
+      const result = runScenario(scenario, meta);
+      results.push(result);
+      console.log(`✓  ${result.meanMs < 1 ? result.meanMs.toFixed(3) + ' ms/op' : result.meanMs.toFixed(2) + ' ms/op'}`);
+    }
+
+    // ── 3. Print results table ────────────────────────────────────────────
+    console.log();
+    printReport(results, meta.nodeCount, meta.edgeCount, meta.heapFootprintBytes, scale.label);
+
+    // ── 4. Free memory before next scale ──────────────────────────────────
+    if (typeof global.gc === 'function') global.gc();
+  }
+
+  console.log('  Done.\n');
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+main().catch(err => {
+  console.error('\n  ✗  Fatal error:', err);
+  process.exit(1);
+});
