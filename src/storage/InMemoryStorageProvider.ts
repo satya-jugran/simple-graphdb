@@ -92,6 +92,9 @@ export class InMemoryStorageProvider implements IStorageProvider {
   // ---------------------------------------------------------------------------
 
   insertNode(node: NodeData): void {
+    if (this._nodes.has(node.id)) {
+      throw new NodeAlreadyExistsError(node.id);
+    }
     this._nodes.set(node.id, node);
 
     // Type index
