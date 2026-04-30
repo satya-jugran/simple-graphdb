@@ -161,6 +161,9 @@ export class InMemoryStorageProvider implements IStorageProvider {
   // ---------------------------------------------------------------------------
 
   insertEdge(edge: EdgeData): void {
+    if (this._edges.has(edge.id)) {
+      throw new EdgeAlreadyExistsError(edge.id);
+    }
     this._edges.set(edge.id, edge);
 
     // Adjacency
