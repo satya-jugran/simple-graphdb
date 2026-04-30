@@ -214,12 +214,12 @@ describe('GraphToMermaid', () => {
   });
 
   describe('integration with Graph serialization', () => {
-    it('should work with Graph.toJSON() output', () => {
+    it('should work with Graph.exportJSON() output', () => {
       const courseId = graph.addNode('Course', { name: 'Python' }).id;
       const chapterId = graph.addNode('Chapter', { name: 'Basics' }).id;
       graph.addEdge(courseId, chapterId, 'CONTAINS');
 
-      const jsonData = graph.toJSON();
+      const jsonData = graph.exportJSON();
       const mermaid = new GraphToMermaid(JSON.stringify(jsonData));
       const result = mermaid.toString();
 

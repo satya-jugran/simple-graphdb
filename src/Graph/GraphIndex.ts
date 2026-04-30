@@ -6,315 +6,128 @@ import {
   NodeNotFoundError,
   NodeHasEdgesError,
 } from '../errors';
+import type { IStorageProvider } from '../storage/IStorageProvider';
+import { InMemoryStorageProvider } from '../storage/InMemoryStorageProvider';
 
 /**
- * Internal class that manages graph indices and data storage.
- * Handles all index maps for O(1) lookups and provides data access methods.
+ * Internal class that manages graph operations.
+ *
+ * GraphIndex is the single point of access for all node/edge CRUD.
+ * It delegates all persistence and index maintenance to an IStorageProvider,
+ * making the backing store swappable (in-memory, SQLite, LMDB, …) without
+ * any changes to Graph, GraphTraversal, or GraphAdminOps.
+ *
+ * The default provider is InMemoryStorageProvider, which preserves the
+ * existing in-memory behaviour exactly.
  */
 export class GraphIndex {
-  private readonly _nodes: Map<string, Node> = new Map();
-  private readonly _edges: Map<string, Edge> = new Map();
+  private readonly _store: IStorageProvider;
 
-  // Type index maps for O(1) type-based queries
-  private readonly _nodesByType: Map<string, Set<string>> = new Map();
-  private readonly _edgesByType: Map<string, Set<string>> = new Map();
-
-  // Adjacency maps for O(1) edge lookups
-  private readonly _edgesBySource: Map<string, Set<string>> = new Map();
-  private readonly _edgesByTarget: Map<string, Set<string>> = new Map();
-
-  // Property value index: propKey -> serializedValue -> Set<nodeId>
-  private readonly _nodesByProperty: Map<string, Map<string, Set<string>>> = new Map();
-
-  // -------------------------------------------------------------------------
-  // Package-internal read accessors (used by GraphTraversal / GraphSerializer)
-  // -------------------------------------------------------------------------
-
-  /** @internal Returns the raw node map (read-only view). */
-  _getNodeMap(): ReadonlyMap<string, Node> {
-    return this._nodes;
+  /**
+   * @param store - Storage provider to use. Defaults to InMemoryStorageProvider.
+   */
+  constructor(store: IStorageProvider = new InMemoryStorageProvider()) {
+    this._store = store;
   }
 
-  /** @internal Returns the raw edge map (read-only view). */
-  _getEdgeMap(): ReadonlyMap<string, Edge> {
-    return this._edges;
+  /** @internal Exposes the underlying storage provider (used by Graph to wire GraphTraversal and GraphAdminOps). */
+  _getStore(): IStorageProvider {
+    return this._store;
   }
 
-  /** @internal Returns outgoing edge-id set for a node (read-only view). */
-  _getEdgesBySource(nodeId: string): ReadonlySet<string> {
-    return this._edgesBySource.get(nodeId) ?? new Set();
-  }
-
-  /** @internal Returns incoming edge-id set for a node (read-only view). */
-  _getEdgesByTarget(nodeId: string): ReadonlySet<string> {
-    return this._edgesByTarget.get(nodeId) ?? new Set();
-  }
-
-  /** @internal Serializes a property value to a stable string key for indexing. */
-  private _propKey(value: unknown): string {
-    return JSON.stringify(value) ?? 'undefined';
-  }
-
-  /** @internal Adds a node to the property value index for all its properties. */
-  private _indexNodeProperties(node: Node): void {
-    for (const [key, value] of Object.entries(node.properties)) {
-      const serialized = this._propKey(value);
-      if (!this._nodesByProperty.has(key)) {
-        this._nodesByProperty.set(key, new Map());
-      }
-      const valueMap = this._nodesByProperty.get(key)!;
-      if (!valueMap.has(serialized)) {
-        valueMap.set(serialized, new Set());
-      }
-      valueMap.get(serialized)!.add(node.id);
-    }
-  }
-
-  /** @internal Removes a node from the property value index for all its properties. */
-  private _unindexNodeProperties(node: Node): void {
-    for (const [key, value] of Object.entries(node.properties)) {
-      const serialized = this._propKey(value);
-      const valueMap = this._nodesByProperty.get(key);
-      if (!valueMap) continue;
-      const idSet = valueMap.get(serialized);
-      if (!idSet) continue;
-      idSet.delete(node.id);
-      if (idSet.size === 0) {
-        valueMap.delete(serialized);
-        if (valueMap.size === 0) {
-          this._nodesByProperty.delete(key);
-        }
-      }
-    }
-  }
-
-  /** @internal Directly inserts a pre-constructed Node and updates all indexes (used by deserialization). */
-  _insertNode(node: Node): void {
-    this._nodes.set(node.id, node);
-    if (!this._nodesByType.has(node.type)) {
-      this._nodesByType.set(node.type, new Set());
-    }
-    this._nodesByType.get(node.type)!.add(node.id);
-    this._indexNodeProperties(node);
-  }
-
-  /** @internal Directly inserts a pre-constructed Edge and updates all indexes (used by deserialization). */
-  _insertEdge(edge: Edge): void {
-    this._edges.set(edge.id, edge);
-
-    if (!this._edgesBySource.has(edge.sourceId)) {
-      this._edgesBySource.set(edge.sourceId, new Set());
-    }
-    this._edgesBySource.get(edge.sourceId)!.add(edge.id);
-
-    if (!this._edgesByTarget.has(edge.targetId)) {
-      this._edgesByTarget.set(edge.targetId, new Set());
-    }
-    this._edgesByTarget.get(edge.targetId)!.add(edge.id);
-
-    if (!this._edgesByType.has(edge.type)) {
-      this._edgesByType.set(edge.type, new Set());
-    }
-    this._edgesByType.get(edge.type)!.add(edge.id);
-  }
-
-  // -------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
   // Public API
-  // -------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
 
-  /**
-   * Returns all nodes in the graph.
-   */
+  /** Returns all nodes in the graph. */
   getNodes(): readonly Node[] {
-    return Array.from(this._nodes.values());
+    return this._store.getAllNodes().map(
+      d => new Node(d.type, d.properties, d.id)
+    );
   }
 
-  /**
-   * Returns all edges in the graph.
-   */
+  /** Returns all edges in the graph. */
   getEdges(): readonly Edge[] {
-    return Array.from(this._edges.values());
+    return this._store.getAllEdges().map(
+      d => new Edge(d.sourceId, d.targetId, d.type, d.properties, d.id)
+    );
   }
 
-  /**
-   * Checks if a node exists in the graph.
-   * @param id - Id of the node
-   */
+  /** Checks if a node exists in the graph. */
   hasNode(id: string): boolean {
-    return this._nodes.has(id);
+    return this._store.hasNode(id);
   }
 
-  /**
-   * Checks if an edge exists in the graph.
-   * @param id - Id of the edge
-   */
+  /** Checks if an edge exists in the graph. */
   hasEdge(id: string): boolean {
-    return this._edges.has(id);
+    return this._store.hasEdge(id);
   }
 
   /**
    * Adds a new node to the graph.
-   * @param type - The type (label) of the node
-   * @param properties - Optional JSON properties
-   * @returns The newly created Node
    * @throws NodeAlreadyExistsError if a node with this id already exists
    */
   addNode(type: string, properties: Record<string, unknown> = {}): Node {
     const node = new Node(type, properties);
-    if (this._nodes.has(node.id)) {
+    if (this._store.hasNode(node.id)) {
       throw new NodeAlreadyExistsError(node.id);
     }
-    this._nodes.set(node.id, node);
-
-    // Update type index
-    if (!this._nodesByType.has(type)) {
-      this._nodesByType.set(type, new Set());
-    }
-    this._nodesByType.get(type)!.add(node.id);
-
-    // Update property value index
-    this._indexNodeProperties(node);
-
+    this._store.insertNode(node.toJSON());
     return node;
   }
 
   /**
    * Removes a node from the graph.
-   * @param id - Id of the node to remove
    * @param cascade - If true, also removes all incident edges (default: false)
-   * @returns true if the node was removed, false if it didn't exist
+   * @throws NodeHasEdgesError if cascade is false and the node has incident edges
    */
   removeNode(id: string, cascade: boolean = false): boolean {
-    const node = this._nodes.get(id);
-    if (!node) {
-      return false;
-    }
+    if (!this._store.hasNode(id)) return false;
 
-    const outgoingEdgeIds = this._edgesBySource.get(id) ?? new Set();
-    const incomingEdgeIds = this._edgesByTarget.get(id) ?? new Set();
+    const outgoing = this._store.getEdgesBySource(id);
+    const incoming = this._store.getEdgesByTarget(id);
 
     if (cascade) {
-      // Remove all edges incident to this node using adjacency maps
-      for (const edgeId of [...outgoingEdgeIds]) {
-        this._removeEdgeInternal(edgeId);
-      }
-      for (const edgeId of [...incomingEdgeIds]) {
-        this._removeEdgeInternal(edgeId);
+      for (const edge of [...outgoing, ...incoming]) {
+        this._store.deleteEdge(edge.id);
       }
     } else {
-      // Guard: refuse to leave dangling edges in the edge map
-      const incidentCount = outgoingEdgeIds.size + incomingEdgeIds.size;
+      const incidentCount = outgoing.length + incoming.length;
       if (incidentCount > 0) {
         throw new NodeHasEdgesError(id, incidentCount);
       }
     }
 
-    // Remove from type index
-    const typeSet = this._nodesByType.get(node.type);
-    if (typeSet) {
-      typeSet.delete(id);
-      if (typeSet.size === 0) {
-        this._nodesByType.delete(node.type);
-      }
-    }
-
-    // Remove from property value index
-    this._unindexNodeProperties(node);
-
-    this._nodes.delete(id);
+    this._store.deleteNode(id);
     return true;
   }
 
-  /**
-   * Internal method to remove an edge without cascade checks.
-   */
-  _removeEdgeInternal(edgeId: string): void {
-    const edge = this._edges.get(edgeId);
-    if (!edge) return;
-
-    // Remove from adjacency maps
-    const sourceEdges = this._edgesBySource.get(edge.sourceId);
-    if (sourceEdges) {
-      sourceEdges.delete(edgeId);
-      if (sourceEdges.size === 0) {
-        this._edgesBySource.delete(edge.sourceId);
-      }
-    }
-
-    const targetEdges = this._edgesByTarget.get(edge.targetId);
-    if (targetEdges) {
-      targetEdges.delete(edgeId);
-      if (targetEdges.size === 0) {
-        this._edgesByTarget.delete(edge.targetId);
-      }
-    }
-
-    // Remove from type index
-    const typeSet = this._edgesByType.get(edge.type);
-    if (typeSet) {
-      typeSet.delete(edgeId);
-      if (typeSet.size === 0) {
-        this._edgesByType.delete(edge.type);
-      }
-    }
-
-    this._edges.delete(edgeId);
-  }
-
-  /**
-   * Retrieves a node by id.
-   * @param id - Id of the node
-   * @returns The Node if found, undefined otherwise
-   */
+  /** Retrieves a node by id. */
   getNode(id: string): Node | undefined {
-    return this._nodes.get(id);
+    const data = this._store.getNode(id);
+    if (!data) return undefined;
+    return new Node(data.type, data.properties, data.id);
   }
 
-  /**
-   * Retrieves nodes by their type.
-   * @param type - The node type to filter by
-   * @returns Array of Nodes with the specified type
-   */
+  /** Retrieves nodes by their type. */
   getNodesByType(type: string): Node[] {
-    const nodeIds = this._nodesByType.get(type);
-    if (!nodeIds) {
-      return [];
-    }
-    return Array.from(nodeIds)
-      .map((id) => this._nodes.get(id)!)
-      .filter((node): node is Node => node !== undefined);
+    return this._store.getNodesByType(type).map(
+      d => new Node(d.type, d.properties, d.id)
+    );
   }
 
   /**
    * Retrieves nodes by a property value.
-   * @param key - The property key to search
-   * @param value - The property value to match
    * @param options - Optional options with nodeType filter
-   * @returns Array of Nodes with the specified property value
    */
   getNodesByProperty(key: string, value: unknown, options?: { nodeType?: string }): Node[] {
-    const nodeType = options?.nodeType ?? '*';
-    const serialized = this._propKey(value);
-
-    const valueMap = this._nodesByProperty.get(key);
-    if (!valueMap) return [];
-
-    const nodeIds = valueMap.get(serialized);
-    if (!nodeIds) return [];
-
-    return Array.from(nodeIds)
-      .map((id) => this._nodes.get(id))
-      .filter((node): node is Node => node !== undefined)
-      .filter((node) => nodeType === '*' || node.type === nodeType);
+    return this._store.getNodesByProperty(key, value, options?.nodeType).map(
+      d => new Node(d.type, d.properties, d.id)
+    );
   }
 
   /**
    * Adds a new directed edge to the graph.
-   * @param sourceId - Id of the source node
-   * @param targetId - Id of the target node
-   * @param type - The relationship type
-   * @param properties - Optional JSON properties
-   * @returns The newly created Edge
    * @throws NodeNotFoundError if source or target node doesn't exist
    * @throws EdgeAlreadyExistsError if an edge with this id already exists
    */
@@ -324,253 +137,143 @@ export class GraphIndex {
     type: string,
     properties: Record<string, unknown> = {}
   ): Edge {
-    if (!this._nodes.has(sourceId)) {
-      throw new NodeNotFoundError(sourceId);
-    }
-    if (!this._nodes.has(targetId)) {
-      throw new NodeNotFoundError(targetId);
-    }
+    if (!this._store.hasNode(sourceId)) throw new NodeNotFoundError(sourceId);
+    if (!this._store.hasNode(targetId)) throw new NodeNotFoundError(targetId);
 
     const edge = new Edge(sourceId, targetId, type, properties);
-    if (this._edges.has(edge.id)) {
-      throw new EdgeAlreadyExistsError(edge.id);
-    }
-    this._edges.set(edge.id, edge);
+    if (this._store.hasEdge(edge.id)) throw new EdgeAlreadyExistsError(edge.id);
 
-    // Update adjacency maps
-    if (!this._edgesBySource.has(sourceId)) {
-      this._edgesBySource.set(sourceId, new Set());
-    }
-    this._edgesBySource.get(sourceId)!.add(edge.id);
-
-    if (!this._edgesByTarget.has(targetId)) {
-      this._edgesByTarget.set(targetId, new Set());
-    }
-    this._edgesByTarget.get(targetId)!.add(edge.id);
-
-    // Update type index
-    if (!this._edgesByType.has(type)) {
-      this._edgesByType.set(type, new Set());
-    }
-    this._edgesByType.get(type)!.add(edge.id);
-
+    this._store.insertEdge(edge.toJSON());
     return edge;
   }
 
   /**
    * Removes an edge from the graph.
-   * @param id - Id of the edge to remove
-   * @returns true if the edge was removed, false if it didn't exist
+   * @returns true if removed, false if not found
    */
   removeEdge(id: string): boolean {
-    const edge = this._edges.get(id);
-    if (!edge) {
-      return false;
-    }
-    this._removeEdgeInternal(id);
+    if (!this._store.hasEdge(id)) return false;
+    this._store.deleteEdge(id);
     return true;
   }
 
-  /**
-   * Retrieves an edge by id.
-   * @param id - Id of the edge
-   * @returns The Edge if found, undefined otherwise
-   */
+  /** Retrieves an edge by id. */
   getEdge(id: string): Edge | undefined {
-    return this._edges.get(id);
+    const data = this._store.getEdge(id);
+    if (!data) return undefined;
+    return new Edge(data.sourceId, data.targetId, data.type, data.properties, data.id);
   }
 
   /**
-   * Gets the parent nodes of a given node.
-   * Parents are nodes that have edges pointing TO this node.
-   * @param nodeId - Id of the target node
-   * @param options - Optional traversal options with nodeType and edgeType filters
-   * @returns Array of parent Nodes
+   * Gets the parent nodes of a given node (nodes with edges pointing TO this node).
    * @throws NodeNotFoundError if the node doesn't exist
    */
   getParents(nodeId: string, options?: { nodeType?: string; edgeType?: string }): Node[] {
-    if (!this._nodes.has(nodeId)) {
-      throw new NodeNotFoundError(nodeId);
-    }
+    if (!this._store.hasNode(nodeId)) throw new NodeNotFoundError(nodeId);
 
-    const edgeIds = this._edgesByTarget.get(nodeId) ?? new Set();
-    const parentIds = new Set<string>();
     const nodeType = options?.nodeType ?? '*';
     const edgeType = options?.edgeType ?? '*';
+    const parentIds = new Set<string>();
 
-    for (const edgeId of edgeIds) {
-      const edge = this._edges.get(edgeId);
-      if (!edge) continue;
-
-      const sourceNode = this._nodes.get(edge.sourceId);
-      if (!sourceNode) continue;
-
-      if (edgeType !== '*' && edge.type !== edgeType) {
-        continue;
-      }
-      if (nodeType !== '*' && sourceNode.type !== nodeType) {
-        continue;
-      }
-
+    for (const edge of this._store.getEdgesByTarget(nodeId)) {
+      if (edgeType !== '*' && edge.type !== edgeType) continue;
+      const sourceData = this._store.getNode(edge.sourceId);
+      if (!sourceData) continue;
+      if (nodeType !== '*' && sourceData.type !== nodeType) continue;
       parentIds.add(edge.sourceId);
     }
 
     return Array.from(parentIds)
-      .map((id) => this._nodes.get(id)!)
-      .filter((node): node is Node => node !== undefined);
+      .map(id => this._store.getNode(id))
+      .filter((d): d is NonNullable<typeof d> => d !== undefined)
+      .map(d => new Node(d.type, d.properties, d.id));
   }
 
   /**
-   * Gets the child nodes of a given node.
-   * Children are nodes that this node points TO.
-   * @param nodeId - Id of the source node
-   * @param options - Optional traversal options with nodeType and edgeType filters
-   * @returns Array of child Nodes
+   * Gets the child nodes of a given node (nodes this node points TO).
    * @throws NodeNotFoundError if the node doesn't exist
    */
   getChildren(nodeId: string, options?: { nodeType?: string; edgeType?: string }): Node[] {
-    if (!this._nodes.has(nodeId)) {
-      throw new NodeNotFoundError(nodeId);
-    }
+    if (!this._store.hasNode(nodeId)) throw new NodeNotFoundError(nodeId);
 
-    const edgeIds = this._edgesBySource.get(nodeId) ?? new Set();
-    const childIds = new Set<string>();
     const nodeType = options?.nodeType ?? '*';
     const edgeType = options?.edgeType ?? '*';
+    const childIds = new Set<string>();
 
-    for (const edgeId of edgeIds) {
-      const edge = this._edges.get(edgeId);
-      if (!edge) continue;
-
-      const targetNode = this._nodes.get(edge.targetId);
-      if (!targetNode) continue;
-
-      if (edgeType !== '*' && edge.type !== edgeType) {
-        continue;
-      }
-      if (nodeType !== '*' && targetNode.type !== nodeType) {
-        continue;
-      }
-
+    for (const edge of this._store.getEdgesBySource(nodeId)) {
+      if (edgeType !== '*' && edge.type !== edgeType) continue;
+      const targetData = this._store.getNode(edge.targetId);
+      if (!targetData) continue;
+      if (nodeType !== '*' && targetData.type !== nodeType) continue;
       childIds.add(edge.targetId);
     }
 
     return Array.from(childIds)
-      .map((id) => this._nodes.get(id)!)
-      .filter((node): node is Node => node !== undefined);
+      .map(id => this._store.getNode(id))
+      .filter((d): d is NonNullable<typeof d> => d !== undefined)
+      .map(d => new Node(d.type, d.properties, d.id));
   }
 
   /**
-   * Gets all edges originating from a node (outgoing edges).
-   * @param sourceId - Id of the source node
-   * @param options - Optional traversal options with edgeType filter
-   * @returns Array of outgoing Edges
+   * Gets all outgoing edges from a node.
    * @throws NodeNotFoundError if the node doesn't exist
    */
   getEdgesFrom(sourceId: string, options?: { edgeType?: string }): Edge[] {
-    if (!this._nodes.has(sourceId)) {
-      throw new NodeNotFoundError(sourceId);
-    }
+    if (!this._store.hasNode(sourceId)) throw new NodeNotFoundError(sourceId);
 
-    const edgeIds = this._edgesBySource.get(sourceId) ?? new Set();
     const edgeType = options?.edgeType ?? '*';
-
-    return Array.from(edgeIds)
-      .map((id) => this._edges.get(id))
-      .filter((edge): edge is Edge => edge !== undefined)
-      .filter((edge) => edgeType === '*' || edge.type === edgeType);
+    return this._store.getEdgesBySource(sourceId)
+      .filter(e => edgeType === '*' || e.type === edgeType)
+      .map(d => new Edge(d.sourceId, d.targetId, d.type, d.properties, d.id));
   }
 
   /**
-   * Gets all edges pointing to a node (incoming edges).
-   * @param targetId - Id of the target node
-   * @param options - Optional traversal options with edgeType filter
-   * @returns Array of incoming Edges
+   * Gets all incoming edges to a node.
    * @throws NodeNotFoundError if the node doesn't exist
    */
   getEdgesTo(targetId: string, options?: { edgeType?: string }): Edge[] {
-    if (!this._nodes.has(targetId)) {
-      throw new NodeNotFoundError(targetId);
-    }
+    if (!this._store.hasNode(targetId)) throw new NodeNotFoundError(targetId);
 
-    const edgeIds = this._edgesByTarget.get(targetId) ?? new Set();
     const edgeType = options?.edgeType ?? '*';
-
-    return Array.from(edgeIds)
-      .map((id) => this._edges.get(id))
-      .filter((edge): edge is Edge => edge !== undefined)
-      .filter((edge) => edgeType === '*' || edge.type === edgeType);
+    return this._store.getEdgesByTarget(targetId)
+      .filter(e => edgeType === '*' || e.type === edgeType)
+      .map(d => new Edge(d.sourceId, d.targetId, d.type, d.properties, d.id));
   }
 
   /**
    * Gets all direct edges between two nodes (in either direction).
-   * Only returns edges where the two nodes are directly connected.
-   * @param sourceId - Id of the first node
-   * @param targetId - Id of the second node
-   * @param options - Optional traversal options with edgeType filter
-   * @returns Array of Edges between the nodes
    * @throws NodeNotFoundError if either node doesn't exist
    */
   getDirectEdgesBetween(sourceId: string, targetId: string, options?: { edgeType?: string }): Edge[] {
-    if (!this._nodes.has(sourceId)) {
-      throw new NodeNotFoundError(sourceId);
-    }
-    if (!this._nodes.has(targetId)) {
-      throw new NodeNotFoundError(targetId);
-    }
+    if (!this._store.hasNode(sourceId)) throw new NodeNotFoundError(sourceId);
+    if (!this._store.hasNode(targetId)) throw new NodeNotFoundError(targetId);
 
-    const outgoingEdgeIds = this._edgesBySource.get(sourceId) ?? new Set();
-    const incomingEdgeIds = this._edgesBySource.get(targetId) ?? new Set();
     const edgeType = options?.edgeType ?? '*';
-
     const result: Edge[] = [];
 
-    // Check edges from sourceId to targetId
-    for (const edgeId of outgoingEdgeIds) {
-      const edge = this._edges.get(edgeId);
-      if (!edge) continue;
-      if (edge.targetId === targetId && (edgeType === '*' || edge.type === edgeType)) {
-        result.push(edge);
+    for (const e of this._store.getEdgesBySource(sourceId)) {
+      if (e.targetId === targetId && (edgeType === '*' || e.type === edgeType)) {
+        result.push(new Edge(e.sourceId, e.targetId, e.type, e.properties, e.id));
       }
     }
-
-    // Check edges from targetId to sourceId
-    for (const edgeId of incomingEdgeIds) {
-      const edge = this._edges.get(edgeId);
-      if (!edge) continue;
-      if (edge.targetId === sourceId && (edgeType === '*' || edge.type === edgeType)) {
-        result.push(edge);
+    for (const e of this._store.getEdgesBySource(targetId)) {
+      if (e.targetId === sourceId && (edgeType === '*' || e.type === edgeType)) {
+        result.push(new Edge(e.sourceId, e.targetId, e.type, e.properties, e.id));
       }
     }
 
     return result;
   }
 
-  /**
-   * Gets all edges of a specific type.
-   * @param type - The edge type to filter by
-   * @returns Array of Edges with the specified type
-   */
+  /** Gets all edges of a specific type. */
   getEdgesByType(type: string): Edge[] {
-    const edgeIds = this._edgesByType.get(type);
-    if (!edgeIds) {
-      return [];
-    }
-    return Array.from(edgeIds)
-      .map((id) => this._edges.get(id)!)
-      .filter((edge): edge is Edge => edge !== undefined);
+    return this._store.getEdgesByType(type).map(
+      d => new Edge(d.sourceId, d.targetId, d.type, d.properties, d.id)
+    );
   }
 
-  /**
-   * Clears all data and indices.
-   */
+  /** Clears all data and indices. */
   clear(): void {
-    this._nodes.clear();
-    this._edges.clear();
-    this._nodesByType.clear();
-    this._edgesByType.clear();
-    this._edgesBySource.clear();
-    this._edgesByTarget.clear();
-    this._nodesByProperty.clear();
+    this._store.clear();
   }
 }

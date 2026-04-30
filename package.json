@@ -1,7 +1,7 @@
 {
   "name": "simple-graphdb",
-  "version": "3.2.0",
-  "description": "A lightweight in-memory graph database for TypeScript with support for directed/undirected graphs, BFS/DFS traversal, topological sort, DAG detection, and Mermaid diagram export.",
+  "version": "4.0.0",
+  "description": "A lightweight graph database for TypeScript with a pluggable storage provider architecture, support for directed/undirected graphs, BFS/DFS traversal, topological sort, DAG detection, and Mermaid diagram export.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {

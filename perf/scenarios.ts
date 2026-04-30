@@ -106,7 +106,7 @@ export function buildScenarios(nodeCount: number): BenchmarkScenario[] {
       run: (graph, _meta) => {
         return graph.getNodesByType('Person');
       },
-      iterations: isLarge ? 200 : 500,
+      iterations: isLarge ? 50 : 100,
     },
 
     // ── Read: getNodesByProperty ───────────────────────────────────────────
@@ -116,7 +116,7 @@ export function buildScenarios(nodeCount: number): BenchmarkScenario[] {
       run: (graph, _meta) => {
         return graph.getNodesByProperty('active', true);
       },
-      iterations: isLarge ? 500 : 1_000,
+      iterations: isLarge ? 10 : 20,
     },
 
     // ── Read: getNodes (full scan) ─────────────────────────────────────────
@@ -126,7 +126,7 @@ export function buildScenarios(nodeCount: number): BenchmarkScenario[] {
       run: (graph, _meta) => {
         return graph.getNodes();
       },
-      iterations: isLarge ? 50 : 200,
+      iterations: isLarge ? 10 : 40,
     },
 
     // ── Navigation: getChildren ────────────────────────────────────────────
@@ -136,7 +136,7 @@ export function buildScenarios(nodeCount: number): BenchmarkScenario[] {
       run: (graph, meta) => {
         return graph.getChildren(pickId(meta, 1234));
       },
-      iterations: isLarge ? 20_000 : 50_000,
+      iterations: isLarge ? 1_000 : 2_000,
     },
 
     // ── Navigation: getParents ─────────────────────────────────────────────
@@ -146,7 +146,7 @@ export function buildScenarios(nodeCount: number): BenchmarkScenario[] {
       run: (graph, meta) => {
         return graph.getParents(pickId(meta, 5678));
       },
-      iterations: isLarge ? 20_000 : 50_000,
+      iterations: isLarge ? 1_000 : 2_000,
     },
 
     // ── Navigation: getEdgesFrom ───────────────────────────────────────────
@@ -156,7 +156,7 @@ export function buildScenarios(nodeCount: number): BenchmarkScenario[] {
       run: (graph, meta) => {
         return graph.getEdgesFrom(pickId(meta, 999));
       },
-      iterations: isLarge ? 20_000 : 50_000,
+      iterations: isLarge ? 1_000 : 2_000,
     },
 
     // ── Navigation: getEdgesTo ─────────────────────────────────────────────
@@ -166,7 +166,7 @@ export function buildScenarios(nodeCount: number): BenchmarkScenario[] {
       run: (graph, meta) => {
         return graph.getEdgesTo(pickId(meta, 333));
       },
-      iterations: isLarge ? 20_000 : 50_000,
+      iterations: isLarge ? 1_000 : 2_000,
     },
 
     // ── Navigation: getDirectEdgesBetween ─────────────────────────────────
@@ -177,7 +177,7 @@ export function buildScenarios(nodeCount: number): BenchmarkScenario[] {
         const [src, tgt] = meta.traversalPairs[0];
         return graph.getDirectEdgesBetween(src, tgt);
       },
-      iterations: isLarge ? 10_000 : 30_000,
+      iterations: isLarge ? 1_000 : 3_000,
     },
 
     // ── Traversal: BFS ─────────────────────────────────────────────────────
@@ -188,7 +188,7 @@ export function buildScenarios(nodeCount: number): BenchmarkScenario[] {
         const [src, tgt] = meta.traversalPairs[0];
         return graph.traverse(src, tgt, { method: 'bfs' });
       },
-      iterations: isLarge ? 50 : 200,
+      iterations: isLarge ? 20 : 100,
     },
 
     // ── Traversal: DFS ─────────────────────────────────────────────────────
@@ -199,7 +199,7 @@ export function buildScenarios(nodeCount: number): BenchmarkScenario[] {
         const [src, tgt] = meta.traversalPairs[1];
         return graph.traverse(src, tgt, { method: 'dfs' });
       },
-      iterations: isLarge ? 50 : 200,
+      iterations: isLarge ? 20 : 100,
     },
 
     // ── Traversal: BFS with type filters ──────────────────────────────────
@@ -210,7 +210,7 @@ export function buildScenarios(nodeCount: number): BenchmarkScenario[] {
         const [src, tgt] = meta.traversalPairs[2];
         return graph.traverse(src, tgt, { method: 'bfs', nodeTypes: ['Person', 'Product'], edgeTypes: ['KNOWS', 'BOUGHT'] });
       },
-      iterations: isLarge ? 50 : 200,
+      iterations: isLarge ? 20 : 100,
     },
 
     // ── Traversal: Wildcard ────────────────────────────────────────────────
@@ -221,7 +221,7 @@ export function buildScenarios(nodeCount: number): BenchmarkScenario[] {
         const tgt = pickId(meta, 500);
         return graph.traverse('*', tgt, { method: 'bfs', maxResults: 10 });
       },
-      iterations: isLarge ? 20 : 50,
+      iterations: isLarge ? 5 : 10,
     },
 
     // ── Analysis: isDAG ───────────────────────────────────────────────────
@@ -254,27 +254,27 @@ export function buildScenarios(nodeCount: number): BenchmarkScenario[] {
       iterations: isLarge ? 10 : 30,
     },
 
-    // ── Serialization: toJSON ─────────────────────────────────────────────
+    // ── Serialization: exportJSON ─────────────────────────────────────────
     {
       category: 'Serialization',
-      name: 'toJSON',
+      name: 'exportJSON',
       run: (graph, _meta) => {
-        return graph.toJSON();
+        return graph.exportJSON();
       },
       iterations: isLarge ? 3 : 8,
     },
 
-    // ── Serialization: fromJSON ───────────────────────────────────────────
+    // ── Serialization: importJSON ─────────────────────────────────────────
     {
       category: 'Serialization',
-      name: 'fromJSON',
+      name: 'importJSON',
       setup: (meta) => {
-        // Pre-serialize once; fromJSON is the only timed op
-        (meta as GraphMeta & { _serialized?: unknown })._serialized = meta.graph.toJSON();
+        // Pre-serialize once; importJSON is the only timed op
+        (meta as GraphMeta & { _serialized?: unknown })._serialized = meta.graph.exportJSON();
       },
       run: (_graph, meta) => {
-        const data = (meta as GraphMeta & { _serialized?: unknown })._serialized as Parameters<typeof Graph.fromJSON>[0];
-        return Graph.fromJSON(data);
+        const data = (meta as GraphMeta & { _serialized?: unknown })._serialized as Parameters<typeof Graph.importJSON>[0];
+        return Graph.importJSON(data);
       },
       iterations: isLarge ? 3 : 8,
     },

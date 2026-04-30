@@ -6,7 +6,7 @@ import {
   NodeNotFoundError,
 } from '../../src/errors';
 
-describe('Graph.fromJSON() validation', () => {
+describe('Graph.importJSON() validation', () => {
   let graph: Graph;
 
   beforeEach(() => {
@@ -21,7 +21,7 @@ describe('Graph.fromJSON() validation', () => {
       ],
       edges: [],
     };
-    expect(() => Graph.fromJSON(data)).toThrow(NodeAlreadyExistsError);
+    expect(() => Graph.importJSON(data)).toThrow(NodeAlreadyExistsError);
   });
 
   it('should throw EdgeAlreadyExistsError for duplicate edge IDs', () => {
@@ -35,7 +35,7 @@ describe('Graph.fromJSON() validation', () => {
         { id: 'edge1', sourceId: 'node2', targetId: 'node1', type: 'LINKS', properties: {} },
       ],
     };
-    expect(() => Graph.fromJSON(data)).toThrow(EdgeAlreadyExistsError);
+    expect(() => Graph.importJSON(data)).toThrow(EdgeAlreadyExistsError);
   });
 
   it('should throw NodeNotFoundError for edge referencing non-existent source', () => {
@@ -47,7 +47,7 @@ describe('Graph.fromJSON() validation', () => {
         { id: 'edge1', sourceId: 'non-existent', targetId: 'node1', type: 'LINKS', properties: {} },
       ],
     };
-    expect(() => Graph.fromJSON(data)).toThrow(NodeNotFoundError);
+    expect(() => Graph.importJSON(data)).toThrow(NodeNotFoundError);
   });
 
   it('should throw NodeNotFoundError for edge referencing non-existent target', () => {
@@ -59,7 +59,7 @@ describe('Graph.fromJSON() validation', () => {
         { id: 'edge1', sourceId: 'node1', targetId: 'non-existent', type: 'LINKS', properties: {} },
       ],
     };
-    expect(() => Graph.fromJSON(data)).toThrow(NodeNotFoundError);
+    expect(() => Graph.importJSON(data)).toThrow(NodeNotFoundError);
   });
 
   it('should successfully create graph with valid data', () => {
@@ -72,7 +72,7 @@ describe('Graph.fromJSON() validation', () => {
         { id: 'edge1', sourceId: 'node1', targetId: 'node2', type: 'LINKS', properties: {} },
       ],
     };
-    const graph = Graph.fromJSON(data);
+    const graph = Graph.importJSON(data);
     expect(graph.getNodes()).toHaveLength(2);
     expect(graph.getEdges()).toHaveLength(1);
   });

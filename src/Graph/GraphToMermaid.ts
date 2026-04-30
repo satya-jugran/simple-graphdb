@@ -56,7 +56,7 @@ export class GraphToMermaid {
         throw e;
       }
     } else {
-      this._graphData = graphOrJson.toJSON();
+      this._graphData = graphOrJson.exportJSON();
     }
 
     this._options = {

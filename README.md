@@ -1,6 +1,6 @@
 # simple-graphdb
 
-A lightweight in-memory graph database for TypeScript with support for directed/undirected graphs, BFS/DFS traversal, topological sort, DAG detection, and Mermaid diagram export.
+A lightweight graph database for TypeScript with a **pluggable storage provider architecture**, support for directed/undirected graphs, BFS/DFS traversal, topological sort, DAG detection, and Mermaid diagram export.
 
 ## Installation
 
@@ -127,13 +127,15 @@ graph.traverse('*', '*');
 graph.traverse(['id1', 'id2'], ['id3', 'id4']);
 ```
 
-#### Serialization
+#### Serialization & Admin
 
 | Method | Description |
 |--------|-------------|
-| `toJSON(): GraphData` | Serialize graph to JSON-compatible format |
-| `static fromJSON(data: GraphData): Graph` | Reconstruct graph from data |
+| `exportJSON(): GraphData` | Serialize graph to a JSON-compatible object |
+| `static importJSON(data: GraphData, storageProvider?: IStorageProvider): Graph` | Reconstruct a graph from data with optional custom storage provider |
 | `clear(): void` | Remove all nodes and edges |
+| `toJSON(): GraphData` | ⚠️ Deprecated — use `exportJSON()` |
+| `static fromJSON(data: GraphData): Graph` | ⚠️ Deprecated — use `importJSON()` |
 
 ### GraphToMermaid - Mermaid Diagram Generation
 
@@ -272,18 +274,22 @@ Available errors:
 ## Serialization & Persistence
 
 ```typescript
-// Save graph to JSON
-const data = graph.toJSON();
-const jsonString = JSON.stringify(data, null, 2);
+import { Graph } from 'simple-graphdb';
+import fs from 'fs';
 
-// Persist to storage
-fs.writeFileSync('graph.json', jsonString);
+const graph = new Graph();
+// ... build your graph ...
 
-// Load graph from JSON
-const jsonString = fs.readFileSync('graph.json', 'utf-8');
-const data = JSON.parse(jsonString);
-const restored = Graph.fromJSON(data);
+// Export to JSON
+const data = graph.exportJSON();
+fs.writeFileSync('graph.json', JSON.stringify(data, null, 2));
+
+// Import from JSON
+const raw = JSON.parse(fs.readFileSync('graph.json', 'utf-8'));
+const restored = Graph.importJSON(raw);
 ```
+
+> **Migration from v3:** `toJSON()` and `fromJSON()` are still available but deprecated. Rename calls to `exportJSON()` and `importJSON()` respectively.
 
 ## Cascade Delete
 
@@ -312,7 +318,7 @@ npm install
 # Build TypeScript
 npm run build
 
-# Run tests (126 tests total)
+# Run tests
 npm test
 ```
 
