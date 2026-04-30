@@ -6,7 +6,7 @@ describe('Education Graph', () => {
   let graph: Graph;
 
   beforeEach(() => {
-    graph = Graph.fromJSON(educationGraphData);
+    graph = Graph.importJSON(educationGraphData);
   });
 
   describe('Graph Structure', () => {
@@ -465,8 +465,8 @@ describe('Education Graph', () => {
 
   describe('Serialization', () => {
     it('should serialize and deserialize correctly', () => {
-      const data = graph.toJSON();
-      const restored = Graph.fromJSON(data);
+      const data = graph.exportJSON();
+      const restored = Graph.importJSON(data);
       
       expect(restored.getNodesByType('Course')).toHaveLength(2);
       expect(restored.getNodesByType('Author')).toHaveLength(4);
@@ -478,8 +478,8 @@ describe('Education Graph', () => {
     });
 
     it('should maintain edge types through serialization', () => {
-      const data = graph.toJSON();
-      const restored = Graph.fromJSON(data);
+      const data = graph.exportJSON();
+      const restored = Graph.importJSON(data);
       
       const containsEdges = restored.getEdgesByType('CONTAINS');
       expect(containsEdges.length).toBeGreaterThan(0);

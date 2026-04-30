@@ -292,23 +292,4 @@ export class Graph {
     return graph;
   }
 
-  // ---------------------------------------------------------------------------
-  // Deprecated aliases — kept for backward compatibility, removed in v5.0
-  // ---------------------------------------------------------------------------
-
-  /**
-   * @deprecated Use `exportJSON()` instead. Will be removed in v5.0.
-   * @see exportJSON
-   */
-  toJSON(): GraphData {
-    return this._adminOps.exportJSON();
-  }
-
-  /**
-   * @deprecated Use `Graph.importJSON(data)` instead. Will be removed in v5.0.
-   * @see importJSON
-   */
-  static fromJSON(data: GraphData): Graph {
-    return Graph.importJSON(data);
-  }
 }

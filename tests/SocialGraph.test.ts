@@ -796,7 +796,7 @@ describe('Facebook Social Graph', () => {
   // ========================================
   describe('G. Serialization Round-trip', () => {
     it('should serialize graph to JSON correctly', () => {
-      const json = graph.toJSON();
+      const json = graph.exportJSON();
       
       expect(json.nodes).toBeDefined();
       expect(json.edges).toBeDefined();
@@ -805,7 +805,7 @@ describe('Facebook Social Graph', () => {
     });
 
     it('should preserve all node types during serialization', () => {
-      const json = graph.toJSON();
+      const json = graph.exportJSON();
       
       const personNodes = json.nodes.filter(n => n.type === 'Person');
       const postNodes = json.nodes.filter(n => n.type === 'Post');
@@ -819,16 +819,16 @@ describe('Facebook Social Graph', () => {
     });
 
     it('should reconstruct graph from JSON with all nodes intact', () => {
-      const json = graph.toJSON();
-      const reconstructed = Graph.fromJSON(json);
+      const json = graph.exportJSON();
+      const reconstructed = Graph.importJSON(json);
       
       expect(reconstructed.getNodes()).toHaveLength(42);
       expect(reconstructed.getEdges().length).toBeGreaterThan(60);
     });
 
     it('should preserve relationships after serialization', () => {
-      const json = graph.toJSON();
-      const reconstructed = Graph.fromJSON(json);
+      const json = graph.exportJSON();
+      const reconstructed = Graph.importJSON(json);
       
       // Find Alice's friends in reconstructed graph
       const aliceNode = reconstructed.getNodes().find(n => n.properties.name === 'Alice');
@@ -839,8 +839,8 @@ describe('Facebook Social Graph', () => {
     });
 
     it('should preserve node properties after serialization', () => {
-      const json = graph.toJSON();
-      const reconstructed = Graph.fromJSON(json);
+      const json = graph.exportJSON();
+      const reconstructed = Graph.importJSON(json);
       
       const charlieNode = reconstructed.getNodes().find(n => n.properties.name === 'Charlie');
       expect(charlieNode?.properties.age).toBe(32);
@@ -849,8 +849,8 @@ describe('Facebook Social Graph', () => {
     });
 
     it('should preserve edge properties after serialization', () => {
-      const json = graph.toJSON();
-      const reconstructed = Graph.fromJSON(json);
+      const json = graph.exportJSON();
+      const reconstructed = Graph.importJSON(json);
       
       const friendshipEdges = reconstructed.getEdgesByType('FRIENDS_WITH');
       const aliceBobEdge = friendshipEdges.find(e => {
@@ -865,12 +865,12 @@ describe('Facebook Social Graph', () => {
 
     it('should handle empty graph serialization', () => {
       const emptyGraph = new Graph();
-      const json = emptyGraph.toJSON();
+      const json = emptyGraph.exportJSON();
       
       expect(json.nodes).toHaveLength(0);
       expect(json.edges).toHaveLength(0);
       
-      const reconstructed = Graph.fromJSON(json);
+      const reconstructed = Graph.importJSON(json);
       expect(reconstructed.getNodes()).toHaveLength(0);
     });
   });

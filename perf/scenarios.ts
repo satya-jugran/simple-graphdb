@@ -254,27 +254,27 @@ export function buildScenarios(nodeCount: number): BenchmarkScenario[] {
       iterations: isLarge ? 10 : 30,
     },
 
-    // ── Serialization: toJSON ─────────────────────────────────────────────
+    // ── Serialization: exportJSON ─────────────────────────────────────────
     {
       category: 'Serialization',
-      name: 'toJSON',
+      name: 'exportJSON',
       run: (graph, _meta) => {
-        return graph.toJSON();
+        return graph.exportJSON();
       },
       iterations: isLarge ? 3 : 8,
     },
 
-    // ── Serialization: fromJSON ───────────────────────────────────────────
+    // ── Serialization: importJSON ─────────────────────────────────────────
     {
       category: 'Serialization',
-      name: 'fromJSON',
+      name: 'importJSON',
       setup: (meta) => {
-        // Pre-serialize once; fromJSON is the only timed op
-        (meta as GraphMeta & { _serialized?: unknown })._serialized = meta.graph.toJSON();
+        // Pre-serialize once; importJSON is the only timed op
+        (meta as GraphMeta & { _serialized?: unknown })._serialized = meta.graph.exportJSON();
       },
       run: (_graph, meta) => {
-        const data = (meta as GraphMeta & { _serialized?: unknown })._serialized as Parameters<typeof Graph.fromJSON>[0];
-        return Graph.fromJSON(data);
+        const data = (meta as GraphMeta & { _serialized?: unknown })._serialized as Parameters<typeof Graph.importJSON>[0];
+        return Graph.importJSON(data);
       },
       iterations: isLarge ? 3 : 8,
     },
