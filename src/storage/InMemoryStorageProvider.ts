@@ -92,10 +92,16 @@ export class InMemoryStorageProvider implements IStorageProvider {
   // ---------------------------------------------------------------------------
 
   insertNode(node: NodeData): void {
+    this._insertNode(node, false);
+  }
+
+  /** @internal Used by importJSON — skips the defensive clone since the data is already owned. */
+  private _insertNode(node: NodeData, skipClone: boolean): void {
     if (this._nodes.has(node.id)) {
       throw new NodeAlreadyExistsError(node.id);
     }
-    this._nodes.set(node.id, node);
+    const stored = skipClone ? node : deepClone(node);
+    this._nodes.set(node.id, stored);
 
     // Type index
     if (!this._nodesByType.has(node.type)) {
@@ -104,7 +110,7 @@ export class InMemoryStorageProvider implements IStorageProvider {
     this._nodesByType.get(node.type)!.add(node.id);
 
     // Property value index
-    this._indexNodeProperties(node);
+    this._indexNodeProperties(stored);
   }
 
   deleteNode(id: string): void {
@@ -133,11 +139,12 @@ export class InMemoryStorageProvider implements IStorageProvider {
   }
 
   getNode(id: string): NodeData | undefined {
-    return this._nodes.get(id);
+    const node = this._nodes.get(id);
+    return node ? deepClone(node) : undefined;
   }
 
   getAllNodes(): NodeData[] {
-    return Array.from(this._nodes.values());
+    return Array.from(this._nodes.values()).map(deepClone);
   }
 
   getNodesByType(type: string): NodeData[] {
@@ -145,7 +152,8 @@ export class InMemoryStorageProvider implements IStorageProvider {
     if (!ids) return [];
     return Array.from(ids)
       .map(id => this._nodes.get(id))
-      .filter((n): n is NodeData => n !== undefined);
+      .filter((n): n is NodeData => n !== undefined)
+      .map(deepClone);
   }
 
   getNodesByProperty(key: string, value: unknown, nodeType?: string): NodeData[] {
@@ -157,7 +165,8 @@ export class InMemoryStorageProvider implements IStorageProvider {
     return Array.from(ids)
       .map(id => this._nodes.get(id))
       .filter((n): n is NodeData => n !== undefined)
-      .filter(n => !nodeType || nodeType === '*' || n.type === nodeType);
+      .filter(n => !nodeType || nodeType === '*' || n.type === nodeType)
+      .map(deepClone);
   }
 
   // ---------------------------------------------------------------------------
@@ -165,10 +174,16 @@ export class InMemoryStorageProvider implements IStorageProvider {
   // ---------------------------------------------------------------------------
 
   insertEdge(edge: EdgeData): void {
+    this._insertEdge(edge, false);
+  }
+
+  /** @internal Used by importJSON — skips the defensive clone since the data is already owned. */
+  private _insertEdge(edge: EdgeData, skipClone: boolean): void {
     if (this._edges.has(edge.id)) {
       throw new EdgeAlreadyExistsError(edge.id);
     }
-    this._edges.set(edge.id, edge);
+    const stored = skipClone ? edge : deepClone(edge);
+    this._edges.set(edge.id, stored);
 
     // Adjacency
     if (!this._edgesBySource.has(edge.sourceId)) {
@@ -224,11 +239,12 @@ export class InMemoryStorageProvider implements IStorageProvider {
   }
 
   getEdge(id: string): EdgeData | undefined {
-    return this._edges.get(id);
+    const edge = this._edges.get(id);
+    return edge ? deepClone(edge) : undefined;
   }
 
   getAllEdges(): EdgeData[] {
-    return Array.from(this._edges.values());
+    return Array.from(this._edges.values()).map(deepClone);
   }
 
   getEdgesByType(type: string): EdgeData[] {
@@ -236,7 +252,8 @@ export class InMemoryStorageProvider implements IStorageProvider {
     if (!ids) return [];
     return Array.from(ids)
       .map(id => this._edges.get(id))
-      .filter((e): e is EdgeData => e !== undefined);
+      .filter((e): e is EdgeData => e !== undefined)
+      .map(deepClone);
   }
 
   getEdgesBySource(nodeId: string): EdgeData[] {
@@ -244,7 +261,8 @@ export class InMemoryStorageProvider implements IStorageProvider {
     if (!ids) return [];
     return Array.from(ids)
       .map(id => this._edges.get(id))
-      .filter((e): e is EdgeData => e !== undefined);
+      .filter((e): e is EdgeData => e !== undefined)
+      .map(deepClone);
   }
 
   getEdgesByTarget(nodeId: string): EdgeData[] {
@@ -252,7 +270,8 @@ export class InMemoryStorageProvider implements IStorageProvider {
     if (!ids) return [];
     return Array.from(ids)
       .map(id => this._edges.get(id))
-      .filter((e): e is EdgeData => e !== undefined);
+      .filter((e): e is EdgeData => e !== undefined)
+      .map(deepClone);
   }
 
   // ---------------------------------------------------------------------------
@@ -280,23 +299,20 @@ export class InMemoryStorageProvider implements IStorageProvider {
    */
   importJSON(data: GraphData): void {
     for (const nodeData of data.nodes) {
-      if (this._nodes.has(nodeData.id)) {
-        throw new NodeAlreadyExistsError(nodeData.id);
-      }
-      this.insertNode(nodeData);
+      // _insertNode throws NodeAlreadyExistsError on duplicate ids
+      this._insertNode(nodeData, true);
     }
 
     for (const edgeData of data.edges) {
-      if (this._edges.has(edgeData.id)) {
-        throw new EdgeAlreadyExistsError(edgeData.id);
-      }
+      // Validate node references before inserting
       if (!this._nodes.has(edgeData.sourceId)) {
         throw new NodeNotFoundError(edgeData.sourceId);
       }
       if (!this._nodes.has(edgeData.targetId)) {
         throw new NodeNotFoundError(edgeData.targetId);
       }
-      this.insertEdge(edgeData);
+      // _insertEdge throws EdgeAlreadyExistsError on duplicate ids
+      this._insertEdge(edgeData, true);
     }
   }
 
