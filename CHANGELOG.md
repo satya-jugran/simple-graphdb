@@ -5,6 +5,67 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.0] - 2026-04-30
+
+### 🚨 Breaking Changes
+
+1. **`Graph` constructor signature changed**
+   - Old: `new Graph()`
+   - New: `new Graph(storageProvider?: IStorageProvider)`
+   - Default behaviour is unchanged — omitting the argument uses `InMemoryStorageProvider` internally
+   - Passing a custom provider enables pluggable backends (SQLite, LMDB, etc.)
+
+2. **`GraphSerializer` deleted**
+   - `GraphSerializer` class is removed entirely
+   - Replaced by `GraphAdminOps` + provider-owned `exportJSON`/`importJSON`
+
+### ✨ New Features
+
+1. **`IStorageProvider` — Pluggable Storage Abstraction**
+   - New `IStorageProvider` interface in `src/storage/IStorageProvider.ts`
+   - Defines the full contract for node/edge CRUD, type indexes, property index, adjacency index, `exportJSON()`, `importJSON()`, and `clear()`
+   - Any future backend (SQLite, LMDB, MongoDB) implements this interface; no Graph logic changes
+
+2. **`InMemoryStorageProvider` — Default Implementation**
+   - New `InMemoryStorageProvider` class in `src/storage/InMemoryStorageProvider.ts`
+   - All Map/Set logic moved here from the old `GraphIndex`
+   - Implements provider-owned `exportJSON()` (full iteration) and `importJSON()` (with full validation)
+   - Used automatically when no provider is passed to `new Graph()`
+
+3. **`GraphAdminOps` — Replaces `GraphSerializer`**
+   - New `GraphAdminOps` class in `src/Graph/GraphAdminOps.ts`
+   - `constructor(store: IStorageProvider)`
+   - `exportJSON(): GraphData` — delegates to `store.exportJSON()`
+   - `importJSON(data: GraphData): void` — delegates to `store.importJSON(data)`
+   - Each storage provider owns its own import/export strategy (e.g. batching for DB backends)
+
+4. **`Graph.exportJSON()` and `Graph.importJSON()` (new primary API)**
+   - `graph.exportJSON(): GraphData` — serialize the graph to a JSON-compatible object
+   - `Graph.importJSON(data: GraphData, storageProvider?: IStorageProvider): Graph` — reconstruct a graph from data, with optional custom provider
+
+5. **`GraphTraversal` decoupled from `GraphIndex`**
+   - `GraphTraversal` now takes `IStorageProvider` directly instead of `GraphIndex`
+   - Enables traversal over any storage backend without a `GraphIndex` wrapper
+
+### 🗑️ Deprecated (kept for backward compatibility)
+
+- `graph.toJSON()` — use `graph.exportJSON()` instead
+- `Graph.fromJSON(data)` — use `Graph.importJSON(data)` instead
+
+### 🆕 New Exports
+
+- `IStorageProvider` (type) — storage provider interface
+- `InMemoryStorageProvider` — default in-memory implementation
+- `GraphAdminOps` — admin operations class
+
+### 🔒 Internal Improvements
+
+- `GraphIndex` is now a pure CRUD orchestrator: all Map/Set storage moved to `InMemoryStorageProvider`
+- All `@internal` accessor methods (`_getNodeMap`, `_getEdgeMap`, `_getEdgesBySource`, `_getEdgesByTarget`, `_insertNode`, `_insertEdge`, `_removeEdgeInternal`) removed from `GraphIndex`
+- `GraphIndex._getStore()` is the only remaining internal accessor, used once in `Graph.ts`
+
+---
+
 ## [3.2.0] - 2026-04-29
 
 ### 🔒 Internal Improvements

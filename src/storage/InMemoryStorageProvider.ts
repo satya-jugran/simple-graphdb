@@ -1,0 +1,296 @@
+import type { NodeData, EdgeData, GraphData } from '../types';
+import type { IStorageProvider } from './IStorageProvider';
+import {
+  NodeAlreadyExistsError,
+  EdgeAlreadyExistsError,
+  NodeNotFoundError,
+} from '../errors';
+
+/**
+ * Default in-memory implementation of IStorageProvider.
+ *
+ * Uses the same Map / Set structures that GraphIndex previously owned directly.
+ * All operations are O(1) amortised (hash-map / set lookups) except
+ * getAllNodes() / getAllEdges() which are O(n).
+ *
+ * This implementation keeps the library fully backward-compatible while
+ * establishing the provider abstraction that future file-backed or
+ * network-backed providers will implement.
+ */
+export class InMemoryStorageProvider implements IStorageProvider {
+  // Primary stores
+  private readonly _nodes = new Map<string, NodeData>();
+  private readonly _edges = new Map<string, EdgeData>();
+
+  // Type index maps
+  private readonly _nodesByType = new Map<string, Set<string>>();
+  private readonly _edgesByType = new Map<string, Set<string>>();
+
+  // Adjacency maps
+  private readonly _edgesBySource = new Map<string, Set<string>>();
+  private readonly _edgesByTarget = new Map<string, Set<string>>();
+
+  // Property value index: propKey → serializedValue → Set<nodeId>
+  private readonly _nodesByProperty = new Map<string, Map<string, Set<string>>>();
+
+  // ---------------------------------------------------------------------------
+  // Helpers
+  // ---------------------------------------------------------------------------
+
+  private _propKey(value: unknown): string {
+    return JSON.stringify(value) ?? 'undefined';
+  }
+
+  private _indexNodeProperties(node: NodeData): void {
+    for (const [key, value] of Object.entries(node.properties)) {
+      const serialized = this._propKey(value);
+      if (!this._nodesByProperty.has(key)) {
+        this._nodesByProperty.set(key, new Map());
+      }
+      const valueMap = this._nodesByProperty.get(key)!;
+      if (!valueMap.has(serialized)) {
+        valueMap.set(serialized, new Set());
+      }
+      valueMap.get(serialized)!.add(node.id);
+    }
+  }
+
+  private _unindexNodeProperties(node: NodeData): void {
+    for (const [key, value] of Object.entries(node.properties)) {
+      const serialized = this._propKey(value);
+      const valueMap = this._nodesByProperty.get(key);
+      if (!valueMap) continue;
+      const idSet = valueMap.get(serialized);
+      if (!idSet) continue;
+      idSet.delete(node.id);
+      if (idSet.size === 0) {
+        valueMap.delete(serialized);
+        if (valueMap.size === 0) {
+          this._nodesByProperty.delete(key);
+        }
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Lifecycle
+  // ---------------------------------------------------------------------------
+
+  clear(): void {
+    this._nodes.clear();
+    this._edges.clear();
+    this._nodesByType.clear();
+    this._edgesByType.clear();
+    this._edgesBySource.clear();
+    this._edgesByTarget.clear();
+    this._nodesByProperty.clear();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Node mutations
+  // ---------------------------------------------------------------------------
+
+  insertNode(node: NodeData): void {
+    this._nodes.set(node.id, node);
+
+    // Type index
+    if (!this._nodesByType.has(node.type)) {
+      this._nodesByType.set(node.type, new Set());
+    }
+    this._nodesByType.get(node.type)!.add(node.id);
+
+    // Property value index
+    this._indexNodeProperties(node);
+  }
+
+  deleteNode(id: string): void {
+    const node = this._nodes.get(id);
+    if (!node) return;
+
+    // Type index
+    const typeSet = this._nodesByType.get(node.type);
+    if (typeSet) {
+      typeSet.delete(id);
+      if (typeSet.size === 0) this._nodesByType.delete(node.type);
+    }
+
+    // Property value index
+    this._unindexNodeProperties(node);
+
+    this._nodes.delete(id);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Node queries
+  // ---------------------------------------------------------------------------
+
+  hasNode(id: string): boolean {
+    return this._nodes.has(id);
+  }
+
+  getNode(id: string): NodeData | undefined {
+    return this._nodes.get(id);
+  }
+
+  getAllNodes(): NodeData[] {
+    return Array.from(this._nodes.values());
+  }
+
+  getNodesByType(type: string): NodeData[] {
+    const ids = this._nodesByType.get(type);
+    if (!ids) return [];
+    return Array.from(ids)
+      .map(id => this._nodes.get(id))
+      .filter((n): n is NodeData => n !== undefined);
+  }
+
+  getNodesByProperty(key: string, value: unknown, nodeType?: string): NodeData[] {
+    const serialized = this._propKey(value);
+    const valueMap = this._nodesByProperty.get(key);
+    if (!valueMap) return [];
+    const ids = valueMap.get(serialized);
+    if (!ids) return [];
+    return Array.from(ids)
+      .map(id => this._nodes.get(id))
+      .filter((n): n is NodeData => n !== undefined)
+      .filter(n => !nodeType || nodeType === '*' || n.type === nodeType);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Edge mutations
+  // ---------------------------------------------------------------------------
+
+  insertEdge(edge: EdgeData): void {
+    this._edges.set(edge.id, edge);
+
+    // Adjacency
+    if (!this._edgesBySource.has(edge.sourceId)) {
+      this._edgesBySource.set(edge.sourceId, new Set());
+    }
+    this._edgesBySource.get(edge.sourceId)!.add(edge.id);
+
+    if (!this._edgesByTarget.has(edge.targetId)) {
+      this._edgesByTarget.set(edge.targetId, new Set());
+    }
+    this._edgesByTarget.get(edge.targetId)!.add(edge.id);
+
+    // Type index
+    if (!this._edgesByType.has(edge.type)) {
+      this._edgesByType.set(edge.type, new Set());
+    }
+    this._edgesByType.get(edge.type)!.add(edge.id);
+  }
+
+  deleteEdge(id: string): void {
+    const edge = this._edges.get(id);
+    if (!edge) return;
+
+    // Adjacency
+    const srcSet = this._edgesBySource.get(edge.sourceId);
+    if (srcSet) {
+      srcSet.delete(id);
+      if (srcSet.size === 0) this._edgesBySource.delete(edge.sourceId);
+    }
+
+    const tgtSet = this._edgesByTarget.get(edge.targetId);
+    if (tgtSet) {
+      tgtSet.delete(id);
+      if (tgtSet.size === 0) this._edgesByTarget.delete(edge.targetId);
+    }
+
+    // Type index
+    const typeSet = this._edgesByType.get(edge.type);
+    if (typeSet) {
+      typeSet.delete(id);
+      if (typeSet.size === 0) this._edgesByType.delete(edge.type);
+    }
+
+    this._edges.delete(id);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Edge queries
+  // ---------------------------------------------------------------------------
+
+  hasEdge(id: string): boolean {
+    return this._edges.has(id);
+  }
+
+  getEdge(id: string): EdgeData | undefined {
+    return this._edges.get(id);
+  }
+
+  getAllEdges(): EdgeData[] {
+    return Array.from(this._edges.values());
+  }
+
+  getEdgesByType(type: string): EdgeData[] {
+    const ids = this._edgesByType.get(type);
+    if (!ids) return [];
+    return Array.from(ids)
+      .map(id => this._edges.get(id))
+      .filter((e): e is EdgeData => e !== undefined);
+  }
+
+  getEdgesBySource(nodeId: string): EdgeData[] {
+    const ids = this._edgesBySource.get(nodeId);
+    if (!ids) return [];
+    return Array.from(ids)
+      .map(id => this._edges.get(id))
+      .filter((e): e is EdgeData => e !== undefined);
+  }
+
+  getEdgesByTarget(nodeId: string): EdgeData[] {
+    const ids = this._edgesByTarget.get(nodeId);
+    if (!ids) return [];
+    return Array.from(ids)
+      .map(id => this._edges.get(id))
+      .filter((e): e is EdgeData => e !== undefined);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Data portability
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Exports all nodes and edges as a portable GraphData snapshot.
+   * InMemory strategy: single full iteration — O(n) nodes + O(e) edges.
+   */
+  exportJSON(): GraphData {
+    return {
+      nodes: Array.from(this._nodes.values()),
+      edges: Array.from(this._edges.values()),
+    };
+  }
+
+  /**
+   * Imports nodes and edges from a portable GraphData object.
+   * InMemory strategy: single-pass insert for nodes then edges.
+   *
+   * @throws NodeAlreadyExistsError if a node id is already present
+   * @throws EdgeAlreadyExistsError if an edge id is already present
+   * @throws NodeNotFoundError if an edge references a non-existent node
+   */
+  importJSON(data: GraphData): void {
+    for (const nodeData of data.nodes) {
+      if (this._nodes.has(nodeData.id)) {
+        throw new NodeAlreadyExistsError(nodeData.id);
+      }
+      this.insertNode(nodeData);
+    }
+
+    for (const edgeData of data.edges) {
+      if (this._edges.has(edgeData.id)) {
+        throw new EdgeAlreadyExistsError(edgeData.id);
+      }
+      if (!this._nodes.has(edgeData.sourceId)) {
+        throw new NodeNotFoundError(edgeData.sourceId);
+      }
+      if (!this._nodes.has(edgeData.targetId)) {
+        throw new NodeNotFoundError(edgeData.targetId);
+      }
+      this.insertEdge(edgeData);
+    }
+  }
+
+}

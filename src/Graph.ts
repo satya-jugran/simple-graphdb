@@ -3,26 +3,43 @@ import { Node } from './Node';
 import { Edge } from './Edge';
 import { GraphIndex } from './Graph/GraphIndex';
 import { GraphTraversal } from './Graph/GraphTraversal';
-import { GraphSerializer } from './Graph/GraphSerializer';
+import { GraphAdminOps } from './Graph/GraphAdminOps';
 import type { TraversalOptions } from './Graph/TraversalOptions';
+import type { IStorageProvider } from './storage/IStorageProvider';
 
 // Re-export for external use
 export type { TraversalOptions } from './Graph/TraversalOptions';
 
 /**
- * An in-memory graph database with basic features.
+ * A graph database with pluggable storage backend.
  * Manages nodes and directed edges with arbitrary JSON properties.
  * Uses adjacency maps and type indexes for O(1) lookups.
+ *
+ * By default uses an in-memory storage provider. Pass a custom
+ * IStorageProvider to switch to a file-backed or remote backend.
+ *
+ * @example
+ * // Default in-memory (existing behaviour, unchanged)
+ * const graph = new Graph();
+ *
+ * @example
+ * // Future: file-backed SQLite
+ * import { SQLiteStorageProvider } from 'simple-graphdb/storage/sqlite';
+ * const graph = new Graph(new SQLiteStorageProvider({ path: './graph.db' }));
  */
 export class Graph {
   private readonly _index: GraphIndex;
   private readonly _traversal: GraphTraversal;
-  private readonly _serializer: GraphSerializer;
+  private readonly _adminOps: GraphAdminOps;
 
-  constructor() {
-    this._index = new GraphIndex();
-    this._traversal = new GraphTraversal(this._index);
-    this._serializer = new GraphSerializer(this._index);
+  /**
+   * @param storageProvider - Optional storage backend. Defaults to InMemoryStorageProvider.
+   */
+  constructor(storageProvider?: IStorageProvider) {
+    this._index = new GraphIndex(storageProvider);
+    const store = this._index._getStore();
+    this._traversal = new GraphTraversal(store);
+    this._adminOps = new GraphAdminOps(store);
   }
 
   /**
@@ -242,22 +259,56 @@ export class Graph {
     this._index.clear();
   }
 
+  // ---------------------------------------------------------------------------
+  // Data portability — export / import
+  // ---------------------------------------------------------------------------
+
   /**
-   * Serializes the graph to a plain object for JSON storage.
-   * @returns GraphData representation
+   * Exports the entire graph as a portable JSON object.
+   *
+   * The returned `GraphData` value can be persisted, transmitted, or used to
+   * seed another graph instance via `importJSON()`, regardless of the backing
+   * storage provider in use.
+   *
+   * @returns GraphData snapshot of the current graph state
    */
-  toJSON(): GraphData {
-    return this._serializer.toJSON();
+  exportJSON(): GraphData {
+    return this._adminOps.exportJSON();
   }
 
   /**
-   * Creates a new Graph instance from serialized data.
-   * @param data - GraphData to reconstruct from
-   * @returns A new Graph instance with all nodes and edges
+   * Creates a new Graph instance populated from a portable JSON object.
+   *
+   * Works with any IStorageProvider — data is written through the provider's
+   * own insert methods so file-backed or remote providers are populated
+   * correctly.
+   *
+   * @param data - GraphData to load
+   * @returns A new Graph instance with all nodes and edges from the data
+   */
+  static importJSON(data: GraphData, storageProvider?: IStorageProvider): Graph {
+    const graph = new Graph(storageProvider);
+    graph._adminOps.importJSON(data);
+    return graph;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Deprecated aliases — kept for backward compatibility, removed in v5.0
+  // ---------------------------------------------------------------------------
+
+  /**
+   * @deprecated Use `exportJSON()` instead. Will be removed in v5.0.
+   * @see exportJSON
+   */
+  toJSON(): GraphData {
+    return this._adminOps.exportJSON();
+  }
+
+  /**
+   * @deprecated Use `Graph.importJSON(data)` instead. Will be removed in v5.0.
+   * @see importJSON
    */
   static fromJSON(data: GraphData): Graph {
-    const graph = new Graph();
-    graph._serializer.fromJSON(data);
-    return graph;
+    return Graph.importJSON(data);
   }
 }

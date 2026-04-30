@@ -1,12 +1,15 @@
-import { GraphIndex } from './GraphIndex';
+import type { IStorageProvider } from '../storage/IStorageProvider';
 import type { TraversalOptions } from './TraversalOptions';
 
 /**
  * Internal class that handles graph traversal operations.
  * Provides path finding, cycle detection, and topological sorting.
+ *
+ * Operates directly on IStorageProvider so it works correctly with any
+ * storage backend without depending on GraphIndex internals.
  */
 export class GraphTraversal {
-  constructor(private _index: GraphIndex) {}
+  constructor(private _store: IStorageProvider) {}
 
   /**
    * Gets traversable children for a given node during type-filtered traversal.
@@ -16,24 +19,18 @@ export class GraphTraversal {
    * @returns Array of child node ids that pass the type filters
    */
   _getTraversableChildren(nodeId: string, nodeTypes: string[] = ['*'], edgeTypes: string[] = ['*']): string[] {
-    const edgeIds = this._index._getEdgesBySource(nodeId);
-    const edgeMap = this._index._getEdgeMap();
-    const nodeMap = this._index._getNodeMap();
-
+    const outEdges = this._store.getEdgesBySource(nodeId);
     const children: string[] = [];
 
-    for (const edgeId of edgeIds) {
-      const edge = edgeMap.get(edgeId);
-      if (!edge) continue;
-
-      // Apply edge type filter - include all if array is empty, contains '*', or matches
+    for (const edge of outEdges) {
+      // Apply edge type filter
       const shouldFilterEdge = edgeTypes.length > 0 && !edgeTypes.includes('*');
       if (shouldFilterEdge && !edgeTypes.includes(edge.type)) {
         continue;
       }
 
       // Apply node type filter for target node
-      const targetNode = nodeMap.get(edge.targetId);
+      const targetNode = this._store.getNode(edge.targetId);
       if (!targetNode) continue;
       const shouldFilterNode = nodeTypes.length > 0 && !nodeTypes.includes('*');
       if (shouldFilterNode && !nodeTypes.includes(targetNode.type)) {
@@ -53,15 +50,12 @@ export class GraphTraversal {
    * @returns Array of node IDs
    */
   private _normalizeToNodeIds(input: string | string[]): string[] {
+    const allIds = () => this._store.getAllNodes().map(n => n.id);
     if (Array.isArray(input)) {
-      if (input.length === 0 || input.includes('*')) {
-        return Array.from(this._index._getNodeMap().keys());
-      }
+      if (input.length === 0 || input.includes('*')) return allIds();
       return input;
     }
-    if (input === '*') {
-      return Array.from(this._index._getNodeMap().keys());
-    }
+    if (input === '*') return allIds();
     return [input];
   }
 
@@ -89,14 +83,10 @@ export class GraphTraversal {
         const path = this._traverseSingle(src, tgt, options);
         if (path !== null) {
           allPaths.push(path);
-          if (maxResults && allPaths.length >= maxResults) {
-            break;
-          }
+          if (maxResults && allPaths.length >= maxResults) break;
         }
       }
-      if (maxResults && allPaths.length >= maxResults) {
-        break;
-      }
+      if (maxResults && allPaths.length >= maxResults) break;
     }
 
     return allPaths.length > 0 ? allPaths : null;
@@ -115,9 +105,8 @@ export class GraphTraversal {
     options: TraversalOptions
   ): string[] | null {
     const { method = 'bfs', nodeTypes = ['*'], edgeTypes = ['*'] } = options;
-    const nodeMap = this._index._getNodeMap();
 
-    if (!nodeMap.has(sourceId) || !nodeMap.has(targetId)) {
+    if (!this._store.hasNode(sourceId) || !this._store.hasNode(targetId)) {
       return null;
     }
 
@@ -167,7 +156,7 @@ export class GraphTraversal {
 
   /**
    * Check if graph is a Directed Acyclic Graph (no cycles).
-   * Uses DFS-based cycle detection with adjacency map.
+   * Uses DFS-based cycle detection.
    * @returns true if the graph has no cycles, false otherwise
    */
   isDAG(): boolean {
@@ -178,15 +167,10 @@ export class GraphTraversal {
       visited.add(nodeId);
       visiting.add(nodeId);
 
-      // Get children from adjacency map
-      const childIds = this._getTraversableChildren(nodeId);
-      for (const childId of childIds) {
+      for (const childId of this._getTraversableChildren(nodeId)) {
         if (!visited.has(childId)) {
-          if (hasCycle(childId)) {
-            return true;
-          }
+          if (hasCycle(childId)) return true;
         } else if (visiting.has(childId)) {
-          // Found a back edge - cycle detected
           return true;
         }
       }
@@ -195,12 +179,9 @@ export class GraphTraversal {
       return false;
     };
 
-    // Check all nodes
-    for (const node of this._index._getNodeMap().values()) {
+    for (const node of this._store.getAllNodes()) {
       if (!visited.has(node.id)) {
-        if (hasCycle(node.id)) {
-          return false;
-        }
+        if (hasCycle(node.id)) return false;
       }
     }
 
@@ -210,30 +191,29 @@ export class GraphTraversal {
   /**
    * Computes a topological ordering of the graph nodes using Kahn's algorithm.
    * Returns null if the graph is not a DAG (contains cycles).
-   * For DAGs, returns nodes ordered such that all dependencies come before dependents.
    * @returns Array of node ids in topological order, or null if graph has cycles
    */
   topologicalSort(): string[] | null {
-    const nodeMap = this._index._getNodeMap();
-    const edgeMap = this._index._getEdgeMap();
+    const nodes = this._store.getAllNodes();
+    const edges = this._store.getAllEdges();
+
+    const nodeIds = new Set(nodes.map(n => n.id));
 
     // Calculate in-degree for each node
     const inDegree = new Map<string, number>();
-    for (const node of nodeMap.values()) {
+    for (const node of nodes) {
       inDegree.set(node.id, 0);
     }
 
     // Build adjacency list and calculate in-degrees
     const adjacency = new Map<string, string[]>();
-    for (const node of nodeMap.values()) {
+    for (const node of nodes) {
       adjacency.set(node.id, []);
     }
 
-    for (const edge of edgeMap.values()) {
+    for (const edge of edges) {
       // Skip edges with dangling endpoints (nodes removed without cascade)
-      if (!nodeMap.has(edge.sourceId) || !nodeMap.has(edge.targetId)) {
-        continue;
-      }
+      if (!nodeIds.has(edge.sourceId) || !nodeIds.has(edge.targetId)) continue;
       adjacency.get(edge.sourceId)!.push(edge.targetId);
       inDegree.set(edge.targetId, (inDegree.get(edge.targetId) ?? 0) + 1);
     }
@@ -241,9 +221,7 @@ export class GraphTraversal {
     // Kahn's algorithm: start with nodes that have no incoming edges
     const queue: string[] = [];
     for (const [nodeId, degree] of inDegree) {
-      if (degree === 0) {
-        queue.push(nodeId);
-      }
+      if (degree === 0) queue.push(nodeId);
     }
 
     const result: string[] = [];
@@ -253,21 +231,14 @@ export class GraphTraversal {
       const current = queue[queueIndex++];
       result.push(current);
 
-      const neighbors = adjacency.get(current) ?? [];
-      for (const neighbor of neighbors) {
+      for (const neighbor of adjacency.get(current) ?? []) {
         const newDegree = (inDegree.get(neighbor) ?? 1) - 1;
         inDegree.set(neighbor, newDegree);
-        if (newDegree === 0) {
-          queue.push(neighbor);
-        }
+        if (newDegree === 0) queue.push(neighbor);
       }
     }
 
     // If we didn't process all nodes, there's a cycle
-    if (result.length !== nodeMap.size) {
-      return null;
-    }
-
-    return result;
+    return result.length !== nodes.length ? null : result;
   }
 }
