@@ -5,6 +5,7 @@ import {
   EdgeAlreadyExistsError,
   NodeNotFoundError,
 } from '../errors';
+import { deepClone } from '../utils';
 
 /**
  * Default in-memory implementation of IStorageProvider.
@@ -261,8 +262,8 @@ export class InMemoryStorageProvider implements IStorageProvider {
    */
   exportJSON(): GraphData {
     return {
-      nodes: Array.from(this._nodes.values()),
-      edges: Array.from(this._edges.values()),
+      nodes: Array.from(this._nodes.values()).map(deepClone),
+      edges: Array.from(this._edges.values()).map(deepClone),
     };
   }
 
