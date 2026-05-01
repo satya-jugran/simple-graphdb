@@ -182,18 +182,19 @@ export class GraphIndex {
     const edges = await this._store.getEdgesByTarget(nodeId);
     for (const edge of edges) {
       if (edgeType !== '*' && edge.type !== edgeType) continue;
-      const sourceData = await this._store.getNode(edge.sourceId);
-      if (!sourceData) continue;
-      if (nodeType !== '*' && sourceData.type !== nodeType) continue;
-      parentIds.add(edge.sourceId);
+      if (nodeType === '*') {
+        parentIds.add(edge.sourceId);
+      } else {
+        const sourceData = await this._store.getNode(edge.sourceId);
+        if (!sourceData) continue;
+        if (sourceData.type !== nodeType) continue;
+        parentIds.add(edge.sourceId);
+      }
     }
 
-    const parents: Node[] = [];
-    for (const id of parentIds) {
-      const d = await this._store.getNode(id);
-      if (d) parents.push(new Node(d.type, d.properties, d.id));
-    }
-    return parents;
+    if (parentIds.size === 0) return [];
+    const parentDataList = await Promise.all([...parentIds].map(id => this._store.getNode(id)));
+    return parentDataList.filter((d): d is NonNullable<typeof d> => d !== undefined).map(d => new Node(d.type, d.properties, d.id));
   }
 
   /**
@@ -210,18 +211,19 @@ export class GraphIndex {
     const edges = await this._store.getEdgesBySource(nodeId);
     for (const edge of edges) {
       if (edgeType !== '*' && edge.type !== edgeType) continue;
-      const targetData = await this._store.getNode(edge.targetId);
-      if (!targetData) continue;
-      if (nodeType !== '*' && targetData.type !== nodeType) continue;
-      childIds.add(edge.targetId);
+      if (nodeType === '*') {
+        childIds.add(edge.targetId);
+      } else {
+        const targetData = await this._store.getNode(edge.targetId);
+        if (!targetData) continue;
+        if (targetData.type !== nodeType) continue;
+        childIds.add(edge.targetId);
+      }
     }
 
-    const children: Node[] = [];
-    for (const id of childIds) {
-      const d = await this._store.getNode(id);
-      if (d) children.push(new Node(d.type, d.properties, d.id));
-    }
-    return children;
+    if (childIds.size === 0) return [];
+    const childDataList = await Promise.all([...childIds].map(id => this._store.getNode(id)));
+    return childDataList.filter((d): d is NonNullable<typeof d> => d !== undefined).map(d => new Node(d.type, d.properties, d.id));
   }
 
   /**
