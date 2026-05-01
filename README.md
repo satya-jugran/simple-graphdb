@@ -76,36 +76,50 @@ const order = await graph.topologicalSort(); // [authorId, courseId, chapterId]
 
 ```typescript
 import { MongoClient } from 'mongodb';
-import { Graph, MongoStorageProvider } from 'simple-graphdb';
+import { MongoGraphFactory } from 'simple-graphdb';
 
 // Connect to MongoDB
 const client = new MongoClient('mongodb://localhost:27017');
 await client.connect();
 
-// Create provider — uses collections 'sgdb_nodes' and 'sgdb_edges'
-const provider = new MongoStorageProvider(client.db('mydb'));
+const factory = new MongoGraphFactory(client.db('mydb'));
 
-// Create indexes on first startup (idempotent — safe to call every time)
-await provider.ensureIndexes();
+// Create indexes once at startup (idempotent — safe to call every time)
+await factory.ensureIndexes();
 
-// Pass provider to Graph — all API calls are identical to in-memory usage
-const graph = new Graph(provider);
+// Get a graph scoped to a named partition
+const graph = factory.forGraph('my-graph');
 
 const alice = await graph.addNode('Person', { name: 'Alice' });
 const bob   = await graph.addNode('Person', { name: 'Bob' });
 await graph.addEdge(alice.id, bob.id, 'KNOWS');
 
 const path = await graph.traverse(alice.id, bob.id, { edgeTypes: ['KNOWS'] });
+
+// Caller manages the MongoClient lifecycle
+await client.close();
 ```
 
-### MongoStorageProvider Options
+### Direct `MongoStorageProvider` Usage
+
+For fine-grained control over collection names, construct the provider directly:
 
 ```typescript
-new MongoStorageProvider(db, {
+import { MongoClient } from 'mongodb';
+import { Graph, MongoStorageProvider } from 'simple-graphdb';
+
+const client = new MongoClient('mongodb://localhost:27017');
+await client.connect();
+
+const provider = new MongoStorageProvider(client.db('mydb'), {
   graphId: 'my-graph',          // default: 'default' — partitions data by graph id
   nodesCollection: 'my_nodes',  // default: 'sgdb_nodes'
   edgesCollection: 'my_edges',  // default: 'sgdb_edges'
 });
+
+await provider.ensureIndexes();
+
+const graph = new Graph(provider);
 ```
 
 ### Indexes Created by `ensureIndexes()`
@@ -119,34 +133,6 @@ new MongoStorageProvider(db, {
 | edges | `{ graphId: 1, type: 1 }` | `getEdgesByType()` within a graph partition |
 | edges | `{ graphId: 1, sourceId: 1, type: 1 }` | Outgoing adjacency queries |
 | edges | `{ graphId: 1, targetId: 1, type: 1 }` | Incoming adjacency queries |
-
-### Graph Factory Pattern
-
-For managed lifecycle (especially useful with MongoDB), use the factory classes:
-
-```typescript
-import { MongoGraphFactory, InMemoryGraphFactory } from 'simple-graphdb';
-
-// MongoDB — manages client connection lifecycle
-const mongoFactory = new MongoGraphFactory('mongodb://localhost:27017', 'mydb', {
-  graphId: 'my-graph',  // optional, defaults to 'default'
-});
-const graph1 = await mongoFactory.createGraph();
-// ... use graph1 ...
-await graph1.clear(); // clears only this graphId partition
-await mongoFactory.close(); // close MongoDB connection
-
-// In-memory — simple synchronous creation
-const memFactory = new InMemoryGraphFactory({ graphId: 'default' });
-const graph2 = await memFactory.createGraph();
-```
-
-Both factories implement `IGraphFactory`:
-```typescript
-interface IGraphFactory {
-  createGraph(options?: { graphId?: string }): Promise<Graph>;
-}
-```
 
 ## API Reference
 

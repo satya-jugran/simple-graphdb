@@ -88,11 +88,10 @@ export interface MongoStorageProviderOptions {
  *
  * ## Indexes
  * Call `ensureIndexes()` once on startup. It creates:
- *  - Unique index on `_graphId` for both collections (fast id lookups)
- *  - Index on `type` for both collections (type filter queries)
- *  - Compound index on `sourceId` + `type` for edge adjacency queries
- *  - Compound index on `targetId` + `type` for edge adjacency queries
- *  - Index on each tracked property key (built lazily via `getNodesByProperty`)
+ *  - Unique compound index on `(graphId, id)` for both collections (fast id lookups)
+ *  - Index on `(graphId, type)` for both collections (type filter queries)
+ *  - Compound index on `(graphId, sourceId, type)` for outgoing adjacency queries
+ *  - Compound index on `(graphId, targetId, type)` for incoming adjacency queries
  *
  * ## Thread safety
  * MongoDB operations are inherently safe for concurrent use.
