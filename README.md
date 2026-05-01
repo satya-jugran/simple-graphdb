@@ -76,8 +76,7 @@ const order = await graph.topologicalSort(); // [authorId, courseId, chapterId]
 
 ```typescript
 import { MongoClient } from 'mongodb';
-import { Graph } from 'simple-graphdb';
-import { MongoStorageProvider } from 'simple-graphdb/storage/MongoStorageProvider';
+import { Graph, MongoStorageProvider } from 'simple-graphdb';
 
 // Connect to MongoDB
 const client = new MongoClient('mongodb://localhost:27017');

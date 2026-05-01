@@ -29,8 +29,11 @@ export type { TraversalOptions } from './Graph/TraversalOptions';
  *
  * @example
  * // MongoDB-backed graph
- * import { MongoStorageProvider } from 'simple-graphdb/storage/mongo';
- * const provider = new MongoStorageProvider({ uri: 'mongodb://localhost:27017', db: 'graph' });
+ * import { MongoClient } from 'mongodb';
+ * import { Graph, MongoStorageProvider } from 'simple-graphdb';
+ * const client = new MongoClient('mongodb://localhost:27017');
+ * await client.connect();
+ * const provider = new MongoStorageProvider(client.db('graph'));
  * const graph = new Graph(provider);
  */
 export class Graph {
