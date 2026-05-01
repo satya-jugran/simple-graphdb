@@ -10,19 +10,10 @@ let client: MongoClient;
 let provider: MongoStorageProvider;
 
 beforeAll(async () => {
-  mongoServer = await MongoMemoryServer.create({
-    instance: {
-
-      port: 59300, // fixed port for easier debugging (optional)
-    }
-  });
-  client = new MongoClient(mongoServer.getUri(), {
-    serverSelectionTimeoutMS: 5000, // 5 seconds timeout for server selection
-    socketTimeoutMS: 60000, // 1 min timeout for socket operations
-    timeoutMS: 60000, // 1 min timeout for connection attempts
-  });
+  mongoServer = await MongoMemoryServer.create();
+  client = new MongoClient(mongoServer.getUri());
   await client.connect();
-  provider = new MongoStorageProvider(client.db('test'));
+  provider = new MongoStorageProvider(client.db('test'), { graphId: 'default' });
   await provider.ensureIndexes();
 });
 

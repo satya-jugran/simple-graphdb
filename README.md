@@ -103,6 +103,7 @@ const path = await graph.traverse(alice.id, bob.id, { edgeTypes: ['KNOWS'] });
 
 ```typescript
 new MongoStorageProvider(db, {
+  graphId: 'my-graph',          // default: 'default' — partitions data by graph id
   nodesCollection: 'my_nodes',  // default: 'sgdb_nodes'
   edgesCollection: 'my_edges',  // default: 'sgdb_edges'
 });
@@ -112,12 +113,41 @@ new MongoStorageProvider(db, {
 
 | Collection | Index | Purpose |
 |-----------|-------|---------|
-| nodes | `{ _graphId: 1 }` unique | Fast node id lookups |
-| nodes | `{ type: 1 }` | `getNodesByType()` |
-| edges | `{ _graphId: 1 }` unique | Fast edge id lookups |
-| edges | `{ type: 1 }` | `getEdgesByType()` |
-| edges | `{ sourceId: 1, type: 1 }` | Outgoing adjacency queries |
-| edges | `{ targetId: 1, type: 1 }` | Incoming adjacency queries |
+| nodes | `{ graphId: 1, id: 1 }` unique | Fast node id lookups within a graph partition |
+| nodes | `{ graphId: 1, type: 1 }` | `getNodesByType()` within a graph partition |
+| nodes | `{ graphId: 1, properties: 1 }` | Property value lookups within a graph partition |
+| edges | `{ graphId: 1, id: 1 }` unique | Fast edge id lookups within a graph partition |
+| edges | `{ graphId: 1, type: 1 }` | `getEdgesByType()` within a graph partition |
+| edges | `{ graphId: 1, sourceId: 1, type: 1 }` | Outgoing adjacency queries |
+| edges | `{ graphId: 1, targetId: 1, type: 1 }` | Incoming adjacency queries |
+
+### Graph Factory Pattern
+
+For managed lifecycle (especially useful with MongoDB), use the factory classes:
+
+```typescript
+import { MongoGraphFactory, InMemoryGraphFactory } from 'simple-graphdb';
+
+// MongoDB — manages client connection lifecycle
+const mongoFactory = new MongoGraphFactory('mongodb://localhost:27017', 'mydb', {
+  graphId: 'my-graph',  // optional, defaults to 'default'
+});
+const graph1 = await mongoFactory.createGraph();
+// ... use graph1 ...
+await graph1.clear(); // clears only this graphId partition
+await mongoFactory.close(); // close MongoDB connection
+
+// In-memory — simple synchronous creation
+const memFactory = new InMemoryGraphFactory({ graphId: 'default' });
+const graph2 = await memFactory.createGraph();
+```
+
+Both factories implement `IGraphFactory`:
+```typescript
+interface IGraphFactory {
+  createGraph(options?: { graphId?: string }): Promise<Graph>;
+}
+```
 
 ## API Reference
 
@@ -416,26 +446,35 @@ npm install
 # Build TypeScript
 npm run build
 
-# Run tests (212 tests)
+# Run tests (313 tests)
 npm test
 ```
 
 ## Testing
 
-The test suite (212 tests across 11 suites):
+The test suite (313 tests across 16 suites) runs against both `InMemoryStorageProvider` and `MongoStorageProvider` backends:
 
-- `tests/graph/` — Core functionality tests
-  - `Graph.node.test.ts` — Node operations (15 tests)
-  - `Graph.edge.test.ts` — Edge operations (15 tests)
-  - `Graph.traverse.test.ts` — BFS/DFS traversal (24 tests)
-  - `Graph.serialization.test.ts` — Serialization round-trip (5 tests)
-  - `Graph.isDAG.test.ts` — Cycle detection (8 tests)
-  - `Graph.topologicalSort.test.ts` — Topological ordering (10 tests)
-  - `Graph.fromJSON.test.ts` — JSON validation (5 tests)
-  - `Graph.clear.test.ts` — Graph clearing (1 test)
-  - `GraphToMermaid.test.ts` — Mermaid export (20 tests)
-- `tests/SocialGraph.test.ts` — Facebook-style social graph (People, Posts, Photos, Comments) — 74 tests
-- `tests/EducationGraph.test.ts` — Education domain (Courses, Chapters, Sections, Exams, Authors) — 30 tests
+### In-Memory Tests
+- `tests/graph/Graph.node.test.ts` — Node operations
+- `tests/graph/Graph.edge.test.ts` — Edge operations
+- `tests/graph/Graph.traverse.test.ts` — BFS/DFS traversal
+- `tests/graph/Graph.serialization.test.ts` — Serialization round-trip
+- `tests/graph/Graph.isDAG.test.ts` — Cycle detection
+- `tests/graph/Graph.topologicalSort.test.ts` — Topological ordering
+- `tests/graph/Graph.fromJSON.test.ts` — JSON validation
+- `tests/graph/Graph.clear.test.ts` — Graph clearing
+- `tests/graph/GraphToMermaid.test.ts` — Mermaid export
+
+### Cross-Provider Scenarios (InMemory + MongoDB)
+- `tests/EducationGraph.inmemory.test.ts` — Education graph via InMemory provider
+- `tests/EducationGraph.mongo.test.ts` — Education graph via MongoDB provider
+- `tests/SocialGraph.inmemory.test.ts` — Social graph via InMemory provider
+- `tests/SocialGraph.mongo.test.ts` — Social graph via MongoDB provider
+
+### Storage Provider Tests
+- `tests/storage/MongoStorageProvider.test.ts` — MongoDB provider unit tests (isolation, indexing)
+- `tests/storage/MongoGraphFactory.test.ts` — MongoDB factory lifecycle tests
+- `tests/storage/InMemoryGraphFactory.test.ts` — In-memory factory tests
 
 ## License
 

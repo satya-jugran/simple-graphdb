@@ -16,19 +16,24 @@ import {
 
 /**
  * MongoDB document shape for nodes.
- * The graph `id` is stored as `_graphId` to avoid collision with MongoDB's `_id`.
+ * `id` — the node's own element id
+ * `graphId` — the graph partition key this node belongs to
  */
 interface NodeDoc extends Document {
-  _graphId: string;
+  id: string;
+  graphId: string;
   type: string;
   properties: Record<string, unknown>;
 }
 
 /**
  * MongoDB document shape for edges.
+ * `id` — the edge's own element id
+ * `graphId` — the graph partition key this edge belongs to
  */
 interface EdgeDoc extends Document {
-  _graphId: string;
+  id: string;
+  graphId: string;
   sourceId: string;
   targetId: string;
   type: string;
@@ -39,6 +44,12 @@ interface EdgeDoc extends Document {
  * Configuration options for MongoStorageProvider.
  */
 export interface MongoStorageProviderOptions {
+  /**
+   * Graph partition key. All nodes/edges stored by this provider belong to this graph.
+   * @default 'default'
+   */
+  graphId?: string;
+
   /**
    * Name of the MongoDB collection for nodes.
    * @default 'sgdb_nodes'
@@ -92,10 +103,11 @@ export interface MongoStorageProviderOptions {
 export class MongoStorageProvider implements IStorageProvider {
   private readonly _nodes: Collection<NodeDoc>;
   private readonly _edges: Collection<EdgeDoc>;
+  private readonly _graphId: string;
 
   /**
    * @param db   - An already-connected Mongo `Db` instance.
-   * @param opts - Optional collection name overrides.
+   * @param opts - Optional configuration including graphId (partition key).
    */
   constructor(db: Db, opts: MongoStorageProviderOptions = {}) {
     const nodesColl = opts.nodesCollection ?? 'sgdb_nodes';
@@ -103,6 +115,7 @@ export class MongoStorageProvider implements IStorageProvider {
 
     this._nodes = db.collection<NodeDoc>(nodesColl);
     this._edges = db.collection<EdgeDoc>(edgesColl);
+    this._graphId = opts.graphId ?? 'default';
   }
 
   // ---------------------------------------------------------------------------
@@ -117,15 +130,15 @@ export class MongoStorageProvider implements IStorageProvider {
    * Call once on application startup before performing any graph operations.
    */
   async ensureIndexes(): Promise<void> {
-    // Node indexes
-    await this._nodes.createIndex({ _graphId: 1 }, { unique: true, name: 'node_graphId_unique' });
-    await this._nodes.createIndex({ type: 1 }, { name: 'node_type' });
+    // Node indexes — compound unique index on (graphId, id) ensures element id uniqueness per graph
+    await this._nodes.createIndex({ graphId: 1, id: 1 }, { unique: true, name: 'node_graph_id_unique' });
+    await this._nodes.createIndex({ graphId: 1, type: 1 },              { name: 'node_graph_type' });
 
     // Edge indexes
-    await this._edges.createIndex({ _graphId: 1 }, { unique: true, name: 'edge_graphId_unique' });
-    await this._edges.createIndex({ type: 1 }, { name: 'edge_type' });
-    await this._edges.createIndex({ sourceId: 1, type: 1 }, { name: 'edge_source_type' });
-    await this._edges.createIndex({ targetId: 1, type: 1 }, { name: 'edge_target_type' });
+    await this._edges.createIndex({ graphId: 1, id: 1 }, { unique: true, name: 'edge_graph_id_unique' });
+    await this._edges.createIndex({ graphId: 1, type: 1 },              { name: 'edge_graph_type' });
+    await this._edges.createIndex({ graphId: 1, sourceId: 1, type: 1 }, { name: 'edge_graph_source_type' });
+    await this._edges.createIndex({ graphId: 1, targetId: 1, type: 1 }, { name: 'edge_graph_target_type' });
   }
 
   // ---------------------------------------------------------------------------
@@ -134,8 +147,8 @@ export class MongoStorageProvider implements IStorageProvider {
 
   async clear(): Promise<void> {
     await Promise.all([
-      this._nodes.deleteMany({}),
-      this._edges.deleteMany({}),
+      this._nodes.deleteMany({ graphId: this._graphId }),
+      this._edges.deleteMany({ graphId: this._graphId }),
     ]);
   }
 
@@ -144,19 +157,20 @@ export class MongoStorageProvider implements IStorageProvider {
   // ---------------------------------------------------------------------------
 
   async insertNode(node: NodeData): Promise<void> {
-    const exists = await this._nodes.findOne({ _graphId: node.id });
+    const exists = await this._nodes.findOne({ graphId: this._graphId, id: node.id });
     if (exists) {
       throw new NodeAlreadyExistsError(node.id);
     }
     await this._nodes.insertOne({
-      _graphId: node.id,
+      id: node.id,
+      graphId: this._graphId,
       type: node.type,
       properties: node.properties,
     } as NodeDoc);
   }
 
   async deleteNode(id: string): Promise<void> {
-    await this._nodes.deleteOne({ _graphId: id });
+    await this._nodes.deleteOne({ graphId: this._graphId, id });
   }
 
   // ---------------------------------------------------------------------------
@@ -164,27 +178,30 @@ export class MongoStorageProvider implements IStorageProvider {
   // ---------------------------------------------------------------------------
 
   async hasNode(id: string): Promise<boolean> {
-    const count = await this._nodes.countDocuments({ _graphId: id }, { limit: 1 });
+    const count = await this._nodes.countDocuments({ graphId: this._graphId, id }, { limit: 1 });
     return count > 0;
   }
 
   async getNode(id: string): Promise<NodeData | undefined> {
-    const doc = await this._nodes.findOne({ _graphId: id });
+    const doc = await this._nodes.findOne({ graphId: this._graphId, id });
     return doc ? this._docToNode(doc) : undefined;
   }
 
   async getAllNodes(): Promise<NodeData[]> {
-    const docs = await this._nodes.find({}).toArray();
+    const docs = await this._nodes.find({ graphId: this._graphId }).toArray();
     return docs.map(d => this._docToNode(d));
   }
 
   async getNodesByType(type: string): Promise<NodeData[]> {
-    const docs = await this._nodes.find({ type }).toArray();
+    const docs = await this._nodes.find({ graphId: this._graphId, type }).toArray();
     return docs.map(d => this._docToNode(d));
   }
 
   async getNodesByProperty(key: string, value: unknown, nodeType?: string): Promise<NodeData[]> {
-    const filter: Filter<NodeDoc> = { [`properties.${key}`]: value as unknown as WithId<NodeDoc>[keyof WithId<NodeDoc>] };
+    const filter: Filter<NodeDoc> = {
+      graphId: this._graphId,
+      [`properties.${key}`]: value as unknown as WithId<NodeDoc>[keyof WithId<NodeDoc>],
+    };
     if (nodeType !== undefined) {
       filter.type = nodeType;
     }
@@ -197,12 +214,13 @@ export class MongoStorageProvider implements IStorageProvider {
   // ---------------------------------------------------------------------------
 
   async insertEdge(edge: EdgeData): Promise<void> {
-    const exists = await this._edges.findOne({ _graphId: edge.id });
+    const exists = await this._edges.findOne({ graphId: this._graphId, id: edge.id });
     if (exists) {
       throw new EdgeAlreadyExistsError(edge.id);
     }
     await this._edges.insertOne({
-      _graphId: edge.id,
+      id: edge.id,
+      graphId: this._graphId,
       sourceId: edge.sourceId,
       targetId: edge.targetId,
       type: edge.type,
@@ -211,7 +229,7 @@ export class MongoStorageProvider implements IStorageProvider {
   }
 
   async deleteEdge(id: string): Promise<void> {
-    await this._edges.deleteOne({ _graphId: id });
+    await this._edges.deleteOne({ graphId: this._graphId, id });
   }
 
   // ---------------------------------------------------------------------------
@@ -219,32 +237,32 @@ export class MongoStorageProvider implements IStorageProvider {
   // ---------------------------------------------------------------------------
 
   async hasEdge(id: string): Promise<boolean> {
-    const count = await this._edges.countDocuments({ _graphId: id }, { limit: 1 });
+    const count = await this._edges.countDocuments({ graphId: this._graphId, id }, { limit: 1 });
     return count > 0;
   }
 
   async getEdge(id: string): Promise<EdgeData | undefined> {
-    const doc = await this._edges.findOne({ _graphId: id });
+    const doc = await this._edges.findOne({ graphId: this._graphId, id });
     return doc ? this._docToEdge(doc) : undefined;
   }
 
   async getAllEdges(): Promise<EdgeData[]> {
-    const docs = await this._edges.find({}).toArray();
+    const docs = await this._edges.find({ graphId: this._graphId }).toArray();
     return docs.map(d => this._docToEdge(d));
   }
 
   async getEdgesByType(type: string): Promise<EdgeData[]> {
-    const docs = await this._edges.find({ type }).toArray();
+    const docs = await this._edges.find({ graphId: this._graphId, type }).toArray();
     return docs.map(d => this._docToEdge(d));
   }
 
   async getEdgesBySource(nodeId: string): Promise<EdgeData[]> {
-    const docs = await this._edges.find({ sourceId: nodeId }).toArray();
+    const docs = await this._edges.find({ graphId: this._graphId, sourceId: nodeId }).toArray();
     return docs.map(d => this._docToEdge(d));
   }
 
   async getEdgesByTarget(nodeId: string): Promise<EdgeData[]> {
-    const docs = await this._edges.find({ targetId: nodeId }).toArray();
+    const docs = await this._edges.find({ graphId: this._graphId, targetId: nodeId }).toArray();
     return docs.map(d => this._docToEdge(d));
   }
 
@@ -254,8 +272,8 @@ export class MongoStorageProvider implements IStorageProvider {
 
   async exportJSON(): Promise<GraphData> {
     const [nodeDocs, edgeDocs] = await Promise.all([
-      this._nodes.find({}).toArray(),
-      this._edges.find({}).toArray(),
+      this._nodes.find({ graphId: this._graphId }).toArray(),
+      this._edges.find({ graphId: this._graphId }).toArray(),
     ]);
     return {
       nodes: nodeDocs.map(d => this._docToNode(d)),
@@ -284,30 +302,32 @@ export class MongoStorageProvider implements IStorageProvider {
       edgeIdSet.add(e.id);
     }
 
-    // ---- Check for existing ids in the database ----
+    // ---- Check for existing ids in the database under this graphId ----
     if (data.nodes.length > 0) {
       const existingNode = await this._nodes.findOne({
-        _graphId: { $in: data.nodes.map(n => n.id) },
+        graphId: this._graphId,
+        id: { $in: data.nodes.map(n => n.id) },
       });
       if (existingNode) {
-        throw new NodeAlreadyExistsError(existingNode._graphId);
+        throw new NodeAlreadyExistsError(existingNode.id);
       }
     }
     if (data.edges.length > 0) {
       const existingEdge = await this._edges.findOne({
-        _graphId: { $in: data.edges.map(e => e.id) },
+        graphId: this._graphId,
+        id: { $in: data.edges.map(e => e.id) },
       });
       if (existingEdge) {
-        throw new EdgeAlreadyExistsError(existingEdge._graphId);
+        throw new EdgeAlreadyExistsError(existingEdge.id);
       }
     }
 
     // ---- Validate edge source/target references ----
-    // Build a combined set of existing + incoming node ids
+    // Build a combined set of existing + incoming node ids under this graphId
     const existingNodeIds = await this._nodes
-      .find({}, { projection: { _graphId: 1 } })
+      .find({ graphId: this._graphId }, { projection: { id: 1 } })
       .toArray()
-      .then(docs => new Set(docs.map(d => d._graphId)));
+      .then(docs => new Set(docs.map(d => d.id)));
 
     for (const id of nodeIdSet) existingNodeIds.add(id);
 
@@ -320,23 +340,23 @@ export class MongoStorageProvider implements IStorageProvider {
     if (data.nodes.length > 0) {
       await this._nodes.insertMany(
         data.nodes.map(n => ({
-          _graphId: n.id,
+          id: n.id,
+          graphId: this._graphId,
           type: n.type,
           properties: n.properties,
         } as NodeDoc)),
-        { ordered: false },
       );
     }
     if (data.edges.length > 0) {
       await this._edges.insertMany(
         data.edges.map(e => ({
-          _graphId: e.id,
+          id: e.id,
+          graphId: this._graphId,
           sourceId: e.sourceId,
           targetId: e.targetId,
           type: e.type,
           properties: e.properties,
         } as EdgeDoc)),
-        { ordered: false },
       );
     }
   }
@@ -347,7 +367,7 @@ export class MongoStorageProvider implements IStorageProvider {
 
   private _docToNode(doc: WithId<NodeDoc>): NodeData {
     return {
-      id: doc._graphId,
+      id: doc.id,
       type: doc.type,
       properties: doc.properties,
     };
@@ -355,7 +375,7 @@ export class MongoStorageProvider implements IStorageProvider {
 
   private _docToEdge(doc: WithId<EdgeDoc>): EdgeData {
     return {
-      id: doc._graphId,
+      id: doc.id,
       sourceId: doc.sourceId,
       targetId: doc.targetId,
       type: doc.type,

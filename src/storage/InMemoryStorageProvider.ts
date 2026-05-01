@@ -8,21 +8,40 @@ import {
 import { deepClone } from '../utils';
 
 /**
+ * Configuration options for InMemoryStorageProvider.
+ */
+export interface InMemoryStorageProviderOptions {
+  /**
+   * Graph partition key. Stored for metadata parity with MongoStorageProvider.
+   * @default 'default'
+   */
+  graphId?: string;
+}
+
+/**
  * Default in-memory implementation of IStorageProvider.
  *
  * Uses the same Map / Set structures that GraphIndex previously owned directly.
  * All operations are O(1) amortised (hash-map / set lookups) except
  * getAllNodes() / getAllEdges() which are O(n).
  *
- * This implementation keeps the library fully backward-compatible while
- * establishing the provider abstraction that future network-backed providers
- * (MongoDB, PostgreSQL, etc.) will implement.
+ * Each instance is naturally scoped to its own Maps — graphId is stored for
+ * metadata parity with MongoStorageProvider.
  *
  * All methods are async to satisfy the IStorageProvider contract, but this
  * implementation resolves immediately (synchronous) — no I/O overhead.
  */
 export class InMemoryStorageProvider implements IStorageProvider {
+  /** Partition key for metadata parity with MongoStorageProvider. */
+  readonly graphId: string;
+
+  constructor(opts: InMemoryStorageProviderOptions = {}) {
+    this.graphId = opts.graphId ?? 'default';
+  }
+
+  // ---------------------------------------------------------------------------
   // Primary stores
+  // ---------------------------------------------------------------------------
   private readonly _nodes = new Map<string, NodeData>();
   private readonly _edges = new Map<string, EdgeData>();
 

@@ -356,8 +356,15 @@ export function runEducationGraphScenarios(buildGraph: () => Promise<Graph>): vo
       it('should combine nodeType and edgeType filters during traversal', async () => {
         const nodes = await graph.getNodes();
         const python = nodes.find(n => n.properties.name === 'Python');
+        // Find an author who is actually an author of the Python course
+        // (alice and jane are Python authors; john and doe are NodeJS authors)
         const authors = nodes.filter(n => n.type === 'Author');
-        const author = authors[0];
+        const pythonAuthorIds = new Set(
+          (await graph.getEdgesByType('AUTHOR_OF'))
+            .filter(e => e.targetId === python!.id)
+            .map(e => e.sourceId)
+        );
+        const author = authors.find(a => pythonAuthorIds.has(a.id));
 
         const courseChildren = await graph.getChildren(python!.id);
         const chapters = courseChildren.filter(n => n.type === 'Chapter');

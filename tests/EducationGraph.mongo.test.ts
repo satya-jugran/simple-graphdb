@@ -14,7 +14,7 @@ beforeAll(async () => {
   mongoServer = await MongoMemoryServer.create();
   client = new MongoClient(mongoServer.getUri());
   await client.connect();
-  provider = new MongoStorageProvider(client.db('test'));
+  provider = new MongoStorageProvider(client.db('test'), { graphId: 'default' });
   await provider.ensureIndexes();
 });
 

@@ -20,7 +20,7 @@ describe('MongoStorageProvider', () => {
     const uri = mongoServer.getUri();
     client = new MongoClient(uri);
     await client.connect();
-    provider = new MongoStorageProvider(client.db('test'));
+    provider = new MongoStorageProvider(client.db('test'), { graphId: 'default' });
     await provider.ensureIndexes();
   });
 
@@ -30,7 +30,11 @@ describe('MongoStorageProvider', () => {
   });
 
   beforeEach(async () => {
+    // Clear all known graph partitions to ensure test isolation
     await provider.clear();
+    const providerA = new MongoStorageProvider(client.db('test'), { graphId: 'graph-a' });
+    const providerB = new MongoStorageProvider(client.db('test'), { graphId: 'graph-b' });
+    await Promise.all([providerA.clear(), providerB.clear()]);
   });
 
   // ---------------------------------------------------------------------------
@@ -344,5 +348,75 @@ describe('MongoStorageProvider', () => {
     expect(edges).toHaveLength(1);
     expect(nodes.find(n => n.id === 'n1')?.properties.name).toBe('Alice');
     expect(edges[0].properties.since).toBe(2020);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Multi-graph isolation
+  // ---------------------------------------------------------------------------
+
+  it('two providers with different graphId should not see each others nodes', async () => {
+    const providerA = new MongoStorageProvider(client.db('test'), { graphId: 'graph-a' });
+    const providerB = new MongoStorageProvider(client.db('test'), { graphId: 'graph-b' });
+
+    await providerA.insertNode({ id: 'n1', type: 'Person', properties: { name: 'Alice' } });
+    await providerB.insertNode({ id: 'n1', type: 'Person', properties: { name: 'Bob' } }); // same id, different graph
+
+    expect((await providerA.getNode('n1'))?.properties.name).toBe('Alice');
+    expect((await providerB.getNode('n1'))?.properties.name).toBe('Bob');
+    expect(await providerA.getAllNodes()).toHaveLength(1);
+    expect(await providerB.getAllNodes()).toHaveLength(1);
+  });
+
+  it('two providers with different graphId should not see each others edges', async () => {
+    const providerA = new MongoStorageProvider(client.db('test'), { graphId: 'graph-a' });
+    const providerB = new MongoStorageProvider(client.db('test'), { graphId: 'graph-b' });
+
+    await providerA.insertNode({ id: 'n1', type: 'Person', properties: {} });
+    await providerA.insertNode({ id: 'n2', type: 'Person', properties: {} });
+    await providerA.insertEdge({ id: 'e1', sourceId: 'n1', targetId: 'n2', type: 'KNOWS', properties: {} });
+
+    await providerB.insertNode({ id: 'n1', type: 'Person', properties: {} });
+    await providerB.insertNode({ id: 'n2', type: 'Person', properties: {} });
+    await providerB.insertEdge({ id: 'e1', sourceId: 'n1', targetId: 'n2', type: 'LIKES', properties: {} });
+
+    const edgesA = await providerA.getAllEdges();
+    const edgesB = await providerB.getAllEdges();
+    expect(edgesA).toHaveLength(1);
+    expect(edgesA[0].type).toBe('KNOWS');
+    expect(edgesB).toHaveLength(1);
+    expect(edgesB[0].type).toBe('LIKES');
+  });
+
+  it('clear() should only remove nodes/edges for its own graphId', async () => {
+    const providerA = new MongoStorageProvider(client.db('test'), { graphId: 'graph-a' });
+    const providerB = new MongoStorageProvider(client.db('test'), { graphId: 'graph-b' });
+
+    await providerA.insertNode({ id: 'n1', type: 'Person', properties: {} });
+    await providerB.insertNode({ id: 'n1', type: 'Person', properties: {} });
+
+    await providerA.clear();
+
+    expect(await providerA.getAllNodes()).toHaveLength(0);
+    expect(await providerB.getAllNodes()).toHaveLength(1);
+  });
+
+  it('duplicate id within same graphId should throw NodeAlreadyExistsError', async () => {
+    const providerA = new MongoStorageProvider(client.db('test'), { graphId: 'graph-a' });
+
+    await providerA.insertNode({ id: 'n1', type: 'Person', properties: {} });
+    await expect(
+      providerA.insertNode({ id: 'n1', type: 'Person', properties: {} })
+    ).rejects.toThrow(NodeAlreadyExistsError);
+  });
+
+  it('same id in different graphId should not throw on insert', async () => {
+    const providerA = new MongoStorageProvider(client.db('test'), { graphId: 'graph-a' });
+    const providerB = new MongoStorageProvider(client.db('test'), { graphId: 'graph-b' });
+
+    await providerA.insertNode({ id: 'n1', type: 'Person', properties: {} });
+    // Should not throw — different graph partition
+    await expect(
+      providerB.insertNode({ id: 'n1', type: 'Person', properties: {} })
+    ).resolves.toBeUndefined();
   });
 });

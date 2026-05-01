@@ -15,6 +15,12 @@ export type { MermaidOptions } from './Graph/GraphToMermaid';
 // Storage abstraction
 export type { IStorageProvider } from './storage/IStorageProvider';
 export { InMemoryStorageProvider } from './storage/InMemoryStorageProvider';
+export type { InMemoryStorageProviderOptions } from './storage/InMemoryStorageProvider';
+export { MongoStorageProvider } from './storage/MongoStorageProvider';
+export type { MongoStorageProviderOptions } from './storage/MongoStorageProvider';
+export type { IGraphFactory } from './storage/IGraphFactory';
+export { MongoGraphFactory } from './storage/MongoGraphFactory';
+export { InMemoryGraphFactory } from './storage/InMemoryGraphFactory';
 
 // Error classes
 export {
