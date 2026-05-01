@@ -324,17 +324,24 @@ export class MongoStorageProvider implements IStorageProvider {
     }
 
     // ---- Validate edge source/target references ----
-    // Build a combined set of existing + incoming node ids under this graphId
-    const existingNodeIds = await this._nodes
-      .find({ graphId: this._graphId }, { projection: { id: 1 } })
-      .toArray()
-      .then(docs => new Set(docs.map(d => d.id)));
+    // Only load the node ids actually referenced by incoming edges (avoids loading all nodes)
+    const referencedIds = [...nodeIdSet]; // ids from incoming nodes already added above
+    for (const e of data.edges) {
+      referencedIds.push(e.sourceId, e.targetId);
+    }
+    const uniqueReferencedIds = [...new Set(referencedIds)];
+    const existingIdSet = new Set(
+      await this._nodes
+        .find({ graphId: this._graphId, id: { $in: uniqueReferencedIds } }, { projection: { id: 1 } })
+        .toArray()
+        .then(docs => docs.map(d => d.id))
+    );
 
-    for (const id of nodeIdSet) existingNodeIds.add(id);
+    for (const id of nodeIdSet) existingIdSet.add(id);
 
     for (const e of data.edges) {
-      if (!existingNodeIds.has(e.sourceId)) throw new NodeNotFoundError(e.sourceId);
-      if (!existingNodeIds.has(e.targetId)) throw new NodeNotFoundError(e.targetId);
+      if (!existingIdSet.has(e.sourceId)) throw new NodeNotFoundError(e.sourceId);
+      if (!existingIdSet.has(e.targetId)) throw new NodeNotFoundError(e.targetId);
     }
 
     // ---- Bulk insert ----
