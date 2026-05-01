@@ -9,12 +9,10 @@ import type { IStorageProvider } from '../storage/IStorageProvider';
  * actual import/export logic lives inside each provider:
  *
  *  - `InMemoryStorageProvider`  — single-pass full iteration (O(n + e))
- *  - `SQLiteStorageProvider`    — paged cursor reads / batched transactions
- *  - `LmdbStorageProvider`      — range-scan cursor with commit batches
  *  - `MongoStorageProvider`     — aggregation pipeline / bulkWrite
  *
- * Future providers implement `IStorageProvider.exportJSON()` and
- * `IStorageProvider.importJSON()` according to their own optimal strategy.
+ * All methods are async to support both synchronous in-memory providers
+ * and asynchronous network-based providers through a unified API.
  */
 export class GraphAdminOps {
   constructor(private readonly _store: IStorageProvider) {}
@@ -25,7 +23,7 @@ export class GraphAdminOps {
    *
    * @returns GraphData snapshot of the current graph state
    */
-  exportJSON(): GraphData {
+  async exportJSON(): Promise<GraphData> {
     return this._store.exportJSON();
   }
 
@@ -38,7 +36,7 @@ export class GraphAdminOps {
    * @throws EdgeAlreadyExistsError if an edge id is already present
    * @throws NodeNotFoundError if an edge references a non-existent node
    */
-  importJSON(data: GraphData): void {
-    this._store.importJSON(data);
+  async importJSON(data: GraphData): Promise<void> {
+    return this._store.importJSON(data);
   }
 }

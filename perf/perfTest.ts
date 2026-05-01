@@ -50,7 +50,7 @@ async function main(): Promise<void> {
     // ── 1. Build the baseline graph (timed) ───────────────────────────────
     printSectionTitle(`Building graph: ${scale.nodeCount.toLocaleString()} nodes @ ${scale.edgesPerNode} edges/node`);
     const buildStart = process.hrtime.bigint();
-    const meta = buildGraph(scale.nodeCount, scale.edgesPerNode);
+    const meta = await buildGraph(scale.nodeCount, scale.edgesPerNode);
     const buildMs = Number(process.hrtime.bigint() - buildStart) / 1_000_000;
 
     console.log(`  ✓  Built: ${meta.nodeCount.toLocaleString()} nodes, ${meta.edgeCount.toLocaleString()} edges in ${buildMs.toFixed(0)} ms`);
@@ -65,7 +65,7 @@ async function main(): Promise<void> {
 
     for (const scenario of scenarios) {
       process.stdout.write(`     ${scenario.category.padEnd(16)} ${scenario.name.padEnd(30)} `);
-      const result = runScenario(scenario, meta);
+      const result = await runScenario(scenario, meta);
       results.push(result);
       console.log(`✓  ${result.meanMs < 1 ? result.meanMs.toFixed(3) + ' ms/op' : result.meanMs.toFixed(2) + ' ms/op'}`);
     }

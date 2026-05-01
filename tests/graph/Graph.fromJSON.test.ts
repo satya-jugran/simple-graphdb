@@ -9,11 +9,11 @@ import {
 describe('Graph.importJSON() validation', () => {
   let graph: Graph;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     graph = new Graph();
   });
 
-  it('should throw NodeAlreadyExistsError for duplicate node IDs', () => {
+  it('should throw NodeAlreadyExistsError for duplicate node IDs', async () => {
     const data = {
       nodes: [
         { id: 'node1', type: 'Test', properties: { name: 'A' } },
@@ -21,10 +21,10 @@ describe('Graph.importJSON() validation', () => {
       ],
       edges: [],
     };
-    expect(() => Graph.importJSON(data)).toThrow(NodeAlreadyExistsError);
+    await expect(Graph.importJSON(data)).rejects.toThrow(NodeAlreadyExistsError);
   });
 
-  it('should throw EdgeAlreadyExistsError for duplicate edge IDs', () => {
+  it('should throw EdgeAlreadyExistsError for duplicate edge IDs', async () => {
     const data = {
       nodes: [
         { id: 'node1', type: 'Test', properties: { name: 'A' } },
@@ -35,10 +35,10 @@ describe('Graph.importJSON() validation', () => {
         { id: 'edge1', sourceId: 'node2', targetId: 'node1', type: 'LINKS', properties: {} },
       ],
     };
-    expect(() => Graph.importJSON(data)).toThrow(EdgeAlreadyExistsError);
+    await expect(Graph.importJSON(data)).rejects.toThrow(EdgeAlreadyExistsError);
   });
 
-  it('should throw NodeNotFoundError for edge referencing non-existent source', () => {
+  it('should throw NodeNotFoundError for edge referencing non-existent source', async () => {
     const data = {
       nodes: [
         { id: 'node1', type: 'Test', properties: { name: 'A' } },
@@ -47,10 +47,10 @@ describe('Graph.importJSON() validation', () => {
         { id: 'edge1', sourceId: 'non-existent', targetId: 'node1', type: 'LINKS', properties: {} },
       ],
     };
-    expect(() => Graph.importJSON(data)).toThrow(NodeNotFoundError);
+    await expect(Graph.importJSON(data)).rejects.toThrow(NodeNotFoundError);
   });
 
-  it('should throw NodeNotFoundError for edge referencing non-existent target', () => {
+  it('should throw NodeNotFoundError for edge referencing non-existent target', async () => {
     const data = {
       nodes: [
         { id: 'node1', type: 'Test', properties: { name: 'A' } },
@@ -59,10 +59,10 @@ describe('Graph.importJSON() validation', () => {
         { id: 'edge1', sourceId: 'node1', targetId: 'non-existent', type: 'LINKS', properties: {} },
       ],
     };
-    expect(() => Graph.importJSON(data)).toThrow(NodeNotFoundError);
+    await expect(Graph.importJSON(data)).rejects.toThrow(NodeNotFoundError);
   });
 
-  it('should successfully create graph with valid data', () => {
+  it('should successfully create graph with valid data', async () => {
     const data = {
       nodes: [
         { id: 'node1', type: 'Test', properties: { name: 'A' } },
@@ -72,8 +72,8 @@ describe('Graph.importJSON() validation', () => {
         { id: 'edge1', sourceId: 'node1', targetId: 'node2', type: 'LINKS', properties: {} },
       ],
     };
-    const graph = Graph.importJSON(data);
-    expect(graph.getNodes()).toHaveLength(2);
-    expect(graph.getEdges()).toHaveLength(1);
+    const graph = await Graph.importJSON(data);
+    await expect(graph.getNodes()).resolves.toHaveLength(2);
+    await expect(graph.getEdges()).resolves.toHaveLength(1);
   });
 });

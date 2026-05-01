@@ -5,6 +5,54 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.0.0] - 2026-04-30
+
+### 🚨 Breaking Changes
+
+1. **All `Graph` methods are now `async`** (return `Promise<T>`)
+   - Every public method on `Graph` — `addNode()`, `addEdge()`, `getNodes()`, `traverse()`, `isDAG()`, `topologicalSort()`, `exportJSON()`, `importJSON()`, `clear()`, etc. — now returns a `Promise`.
+   - Callers must `await` every call: `const node = await graph.addNode('Person', { name: 'Alice' })`
+   - This is required to support async backends (MongoDB, future SQL adapters) without a separate `AsyncGraph` class.
+
+2. **`GraphToMermaid` no longer accepts a `Graph` instance in its constructor**
+   - Old: `new GraphToMermaid(graph, options)`
+   - New: `await GraphToMermaid.fromGraph(graph, options)` — static async factory method
+   - Constructor still accepts `GraphData | string` for synchronous construction from serialized data.
+
+3. **`IStorageProvider` interface is fully async**
+   - All methods now return `Promise<T>`. Any custom `IStorageProvider` implementation must be updated.
+
+### ✨ New Features
+
+1. **`MongoStorageProvider`** — `src/storage/MongoStorageProvider.ts`
+   - Full `IStorageProvider` implementation backed by MongoDB.
+   - Uses two collections: `sgdb_nodes` and `sgdb_edges` (configurable).
+   - `ensureIndexes()` creates unique indexes on `_graphId`, type indexes, and adjacency indexes for efficient queries.
+   - `importJSON()` uses `bulkWrite` / `insertMany` for efficient bulk loading.
+   - `exportJSON()` uses `Promise.all` for parallel node + edge fetching.
+   - `mongodb` is an **optional** peer dependency (`>= 5.0.0`). Install it only when using `MongoStorageProvider`.
+
+2. **`GraphToMermaid.fromGraph()` static async factory**
+   - `static async fromGraph(graph: Graph, options?: MermaidOptions): Promise<GraphToMermaid>`
+   - Replaces the removed `Graph` constructor overload.
+
+3. **`InMemoryStorageProvider` is now fully async**
+   - All methods are `async` returning `Promise<T>`.
+   - No real async overhead — resolved immediately via the microtask queue.
+   - Enables zero-code migration to an async backend by swapping the provider.
+
+### 📦 New Exports
+
+- `MongoStorageProvider` — MongoDB storage backend
+- `MongoStorageProviderOptions` — configuration type for `MongoStorageProvider`
+
+### 🔧 Internal Changes
+
+- `GraphIndex`, `GraphTraversal`, `GraphAdminOps` all async-native internally.
+- `perf/` benchmark system updated to async (`buildGraph`, `runScenario`, all scenario setup/run functions).
+
+---
+
 ## [4.0.0] - 2026-04-30
 
 ### 🚨 Breaking Changes
