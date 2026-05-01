@@ -306,6 +306,7 @@ export class InMemoryStorageProvider implements IStorageProvider {
    */
   async exportJSON(): Promise<GraphData> {
     return {
+      graphId: this.graphId,
       nodes: Array.from(this._nodes.values()).map(deepClone),
       edges: Array.from(this._edges.values()).map(deepClone),
     };

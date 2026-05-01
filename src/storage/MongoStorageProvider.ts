@@ -276,6 +276,7 @@ export class MongoStorageProvider implements IStorageProvider {
       this._edges.find({ graphId: this._graphId }).toArray(),
     ]);
     return {
+      graphId: this._graphId,
       nodes: nodeDocs.map(d => this._docToNode(d)),
       edges: edgeDocs.map(d => this._docToEdge(d)),
     };

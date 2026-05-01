@@ -10,7 +10,7 @@ describe('Graph.Serialization', () => {
 
   it('should serialize an empty graph', async () => {
     const data = await graph.exportJSON();
-    expect(data).toEqual({ nodes: [], edges: [] });
+    expect(data).toEqual({ graphId: 'default', nodes: [], edges: [] });
   });
 
   it('should serialize a graph with nodes and edges', async () => {
