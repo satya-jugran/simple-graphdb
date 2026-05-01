@@ -85,8 +85,7 @@ export async function buildGraph(
   }
 
   // ── Load via importJSON (single batch insert) ─────────────────────────────
-  const graph = new Graph();
-  await graph.importJSON({ nodes, edges });
+  const graph = await Graph.importJSON({ nodes, edges });
 
   if (typeof global.gc === 'function') global.gc();
   const heapAfter = process.memoryUsage().heapUsed;
@@ -144,8 +143,7 @@ async function buildDag(
     }
   }
 
-  const dagGraph = new Graph();
-  await dagGraph.importJSON({ nodes: dagNodes, edges: dagEdges });
+  const dagGraph = await Graph.importJSON({ nodes: dagNodes, edges: dagEdges });
 
   return { graph: dagGraph, nodeIds: dagNodes.map(n => n.id) };
 }

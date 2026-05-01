@@ -1,16 +1,34 @@
 # simple-graphdb
 
-A lightweight **async-first** graph database for TypeScript with a **pluggable storage provider architecture** — works in-memory out of the box, and plugs into MongoDB (or any custom backend) with zero API changes.
+A lightweight **async-first** TypeScript graph database with **pluggable storage architecture**. Supports **multiple isolated graphs** via `graphId` partitioning. Ships with a zero-dependency in-memory provider; optional MongoDB backend for persistence. Includes BFS/DFS traversal, type/property filtering, topological sort, DAG detection, and Mermaid export.
 
-Features:
-- Directed graphs with typed nodes and edges
-- BFS / DFS traversal with wildcard & array sources/targets
-- Type and property filtering during traversal
-- Topological sort & DAG detection
-- Mermaid diagram export
-- Fully async API — every method returns `Promise<T>`
-- `InMemoryStorageProvider` (built-in, zero dependencies)
-- `MongoStorageProvider` (optional, requires `mongodb >= 5`)
+## Features:
+### Core
+- **Async-first API** — every method returns `Promise<T>`
+- **Directed graphs** with typed nodes and relationship-labeled edges
+- **Multiple graph support** via `graphId` partitioning (isolated graphs in one instance)
+- **Pluggable storage** — swap backends without changing application code
+
+### Storage Providers
+- **`InMemoryStorageProvider`** — built-in, zero dependencies, perfect for development/testing
+- **`MongoStorageProvider`** — optional MongoDB backend (`>= 5.0.0`), with optimized indexes for nodes and edges
+
+### Traversal & Querying
+- **BFS / DFS traversal** — find paths between nodes
+- **Wildcard traversal** — `traverse('*', target)`, `traverse(source, '*')`, or `traverse(['a','b'], ['x','y'])`
+- **Type filtering** — filter by node types (`['Person', 'Company']`) and edge types (`['KNOWS', 'WORKS_AT']`)
+- **Property filtering** — O(1) lookup with property value index
+- **Topological sort** — Kahn's algorithm, returns dependency order
+- **DAG detection** — cycle detection for acyclic graph validation
+
+### Visualization
+- **Mermaid export** — generate flowchart diagrams from graph data
+
+### Data Management
+- **JSON serialization** — `exportJSON()` / `importJSON()` for backup/restore
+- **Deep-frozen properties** — immutability guarantees on node/edge data
+- **Graph factories** — `MongoGraphFactory` and `InMemoryGraphFactory` for controlled instance creation
+
 
 ## Installation
 
