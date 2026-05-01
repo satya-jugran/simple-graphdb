@@ -4,18 +4,18 @@ import { Graph } from '../../src/index';
 describe('Graph.clear()', () => {
   let graph: Graph;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     graph = new Graph();
   });
 
-  it('should remove all nodes and edges', () => {
-    const aliceId = graph.addNode('Person', { name: 'Alice' }).id;
-    const bobId = graph.addNode('Person', { name: 'Bob' }).id;
-    graph.addEdge(aliceId, bobId, 'KNOWS');
+  it('should remove all nodes and edges', async () => {
+    const aliceId = (await graph.addNode('Person', { name: 'Alice' })).id;
+    const bobId = (await graph.addNode('Person', { name: 'Bob' })).id;
+    await graph.addEdge(aliceId, bobId, 'KNOWS');
 
-    graph.clear();
+    await graph.clear();
 
-    expect(graph.getNodes()).toHaveLength(0);
-    expect(graph.getEdges()).toHaveLength(0);
+    await expect(graph.getNodes()).resolves.toHaveLength(0);
+    await expect(graph.getEdges()).resolves.toHaveLength(0);
   });
 });

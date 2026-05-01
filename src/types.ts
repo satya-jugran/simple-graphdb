@@ -19,9 +19,18 @@ export interface EdgeData {
 }
 
 /**
- * Data transfer object for Graph serialization
+ * Data transfer object for Graph serialization.
+ * Optionally carries the graph partition key when round-tripping through a
+ * partitioned storage provider.
  */
 export interface GraphData {
+  /**
+   * Graph partition key. Populated by exportJSON to preserve partition context.
+   * When passed to importJSON, callers are responsible for ensuring the target
+   * provider uses a matching graphId — importJSON does not automatically
+   * re-partition data based on this field.
+   */
+  graphId?: string;
   nodes: NodeData[];
   edges: EdgeData[];
 }

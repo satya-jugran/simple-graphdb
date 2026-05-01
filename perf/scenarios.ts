@@ -21,18 +21,18 @@ export function buildScenarios(nodeCount: number): BenchmarkScenario[] {
       category: 'Write',
       name: 'Graph Construction',
       setup: () => new Graph(), // return fresh graph; ignored — perfTest handles this
-      run: (_graph, meta) => {
+      run: async (_graph, meta) => {
         // Build a small fresh graph each iteration to benchmark construction cost
         const g = new Graph();
         const ids: string[] = [];
         const batch = Math.min(500, Math.floor(meta.nodeCount / 20));
         for (let i = 0; i < batch; i++) {
-          const n = g.addNode('Person', { index: i, label: `node-${i}` });
+          const n = await g.addNode('Person', { index: i, label: `node-${i}` });
           ids.push(n.id);
         }
         const edgeBatch = Math.min(batch * 2, ids.length - 1);
         for (let i = 0; i < edgeBatch; i++) {
-          g.addEdge(ids[i], ids[(i + 1) % ids.length], 'KNOWS');
+          await g.addEdge(ids[i], ids[(i + 1) % ids.length], 'KNOWS');
         }
         return g;
       },
@@ -44,11 +44,10 @@ export function buildScenarios(nodeCount: number): BenchmarkScenario[] {
       category: 'Write',
       name: 'addNode (single)',
       setup: () => {
-        // Return a fresh graph that we'll add nodes into
         return new Graph();
       },
-      run: (graph, _meta) => {
-        graph.addNode('Product', { label: `product-${Math.random()}`, score: 99 });
+      run: async (graph, _meta) => {
+        await graph.addNode('Product', { label: `product-${Math.random()}`, score: 99 });
       },
       iterations: 10_000,
     },
@@ -57,23 +56,23 @@ export function buildScenarios(nodeCount: number): BenchmarkScenario[] {
     {
       category: 'Write',
       name: 'addEdge (single)',
-      setup: (meta) => {
-        // Build a small pool of nodes to connect
+      setup: async (meta) => {
         const g = new Graph();
         const pool = 500;
+        const nodeIds: string[] = [];
         for (let i = 0; i < pool; i++) {
-          g.addNode('Person', { index: i });
+          const n = await g.addNode('Person', { index: i });
+          nodeIds.push(n.id);
         }
-        // Store pool ids in a stable location
-        (meta as GraphMeta & { _edgePool?: string[] })._edgePool = g.getNodes().map(n => n.id);
+        (meta as GraphMeta & { _edgePool?: string[] })._edgePool = nodeIds;
         return g;
       },
-      run: (graph, meta) => {
+      run: async (graph, meta) => {
         const pool = (meta as GraphMeta & { _edgePool?: string[] })._edgePool!;
         const src = pool[Math.floor(Math.random() * pool.length)];
         const tgt = pool[Math.floor(Math.random() * pool.length)];
         if (src !== tgt) {
-          try { graph.addEdge(src, tgt, 'KNOWS'); } catch { /* dup — skip */ }
+          try { await graph.addEdge(src, tgt, 'KNOWS'); } catch { /* dup — skip */ }
         }
       },
       iterations: 5_000,
@@ -83,7 +82,7 @@ export function buildScenarios(nodeCount: number): BenchmarkScenario[] {
     {
       category: 'Read',
       name: 'getNode (by id)',
-      run: (graph, meta) => {
+      run: async (graph, meta) => {
         return graph.getNode(pickId(meta, 42));
       },
       iterations: isLarge ? 50_000 : 100_000,
@@ -93,7 +92,7 @@ export function buildScenarios(nodeCount: number): BenchmarkScenario[] {
     {
       category: 'Read',
       name: 'hasNode',
-      run: (graph, meta) => {
+      run: async (graph, meta) => {
         return graph.hasNode(pickId(meta, 7777));
       },
       iterations: isLarge ? 50_000 : 100_000,
@@ -103,7 +102,7 @@ export function buildScenarios(nodeCount: number): BenchmarkScenario[] {
     {
       category: 'Read',
       name: 'getNodesByType',
-      run: (graph, _meta) => {
+      run: async (graph, _meta) => {
         return graph.getNodesByType('Person');
       },
       iterations: isLarge ? 50 : 100,
@@ -113,7 +112,7 @@ export function buildScenarios(nodeCount: number): BenchmarkScenario[] {
     {
       category: 'Read',
       name: 'getNodesByProperty',
-      run: (graph, _meta) => {
+      run: async (graph, _meta) => {
         return graph.getNodesByProperty('active', true);
       },
       iterations: isLarge ? 10 : 20,
@@ -123,17 +122,17 @@ export function buildScenarios(nodeCount: number): BenchmarkScenario[] {
     {
       category: 'Read',
       name: 'getNodes (all)',
-      run: (graph, _meta) => {
+      run: async (graph, _meta) => {
         return graph.getNodes();
       },
       iterations: isLarge ? 10 : 40,
     },
 
-    // ── Navigation: getChildren ────────────────────────────────────────────
+    // ── Navigation: getChildren ───────────────────────────────────────────
     {
       category: 'Navigation',
       name: 'getChildren',
-      run: (graph, meta) => {
+      run: async (graph, meta) => {
         return graph.getChildren(pickId(meta, 1234));
       },
       iterations: isLarge ? 1_000 : 2_000,
@@ -143,7 +142,7 @@ export function buildScenarios(nodeCount: number): BenchmarkScenario[] {
     {
       category: 'Navigation',
       name: 'getParents',
-      run: (graph, meta) => {
+      run: async (graph, meta) => {
         return graph.getParents(pickId(meta, 5678));
       },
       iterations: isLarge ? 1_000 : 2_000,
@@ -153,7 +152,7 @@ export function buildScenarios(nodeCount: number): BenchmarkScenario[] {
     {
       category: 'Navigation',
       name: 'getEdgesFrom',
-      run: (graph, meta) => {
+      run: async (graph, meta) => {
         return graph.getEdgesFrom(pickId(meta, 999));
       },
       iterations: isLarge ? 1_000 : 2_000,
@@ -163,7 +162,7 @@ export function buildScenarios(nodeCount: number): BenchmarkScenario[] {
     {
       category: 'Navigation',
       name: 'getEdgesTo',
-      run: (graph, meta) => {
+      run: async (graph, meta) => {
         return graph.getEdgesTo(pickId(meta, 333));
       },
       iterations: isLarge ? 1_000 : 2_000,
@@ -173,7 +172,7 @@ export function buildScenarios(nodeCount: number): BenchmarkScenario[] {
     {
       category: 'Navigation',
       name: 'getDirectEdgesBetween',
-      run: (graph, meta) => {
+      run: async (graph, meta) => {
         const [src, tgt] = meta.traversalPairs[0];
         return graph.getDirectEdgesBetween(src, tgt);
       },
@@ -184,7 +183,7 @@ export function buildScenarios(nodeCount: number): BenchmarkScenario[] {
     {
       category: 'Traversal',
       name: 'traverse BFS',
-      run: (graph, meta) => {
+      run: async (graph, meta) => {
         const [src, tgt] = meta.traversalPairs[0];
         return graph.traverse(src, tgt, { method: 'bfs' });
       },
@@ -195,7 +194,7 @@ export function buildScenarios(nodeCount: number): BenchmarkScenario[] {
     {
       category: 'Traversal',
       name: 'traverse DFS',
-      run: (graph, meta) => {
+      run: async (graph, meta) => {
         const [src, tgt] = meta.traversalPairs[1];
         return graph.traverse(src, tgt, { method: 'dfs' });
       },
@@ -206,7 +205,7 @@ export function buildScenarios(nodeCount: number): BenchmarkScenario[] {
     {
       category: 'Traversal',
       name: 'traverse BFS (typed)',
-      run: (graph, meta) => {
+      run: async (graph, meta) => {
         const [src, tgt] = meta.traversalPairs[2];
         return graph.traverse(src, tgt, { method: 'bfs', nodeTypes: ['Person', 'Product'], edgeTypes: ['KNOWS', 'BOUGHT'] });
       },
@@ -217,7 +216,7 @@ export function buildScenarios(nodeCount: number): BenchmarkScenario[] {
     {
       category: 'Traversal',
       name: 'traverse wildcard src',
-      run: (graph, meta) => {
+      run: async (graph, meta) => {
         const tgt = pickId(meta, 500);
         return graph.traverse('*', tgt, { method: 'bfs', maxResults: 10 });
       },
@@ -228,7 +227,7 @@ export function buildScenarios(nodeCount: number): BenchmarkScenario[] {
     {
       category: 'Analysis',
       name: 'isDAG (DAG graph)',
-      run: (_graph, meta) => {
+      run: async (_graph, meta) => {
         return meta.dagGraph.isDAG();
       },
       iterations: isLarge ? 10 : 30,
@@ -238,7 +237,7 @@ export function buildScenarios(nodeCount: number): BenchmarkScenario[] {
     {
       category: 'Analysis',
       name: 'isDAG (cyclic graph)',
-      run: (graph, _meta) => {
+      run: async (graph, _meta) => {
         return graph.isDAG();
       },
       iterations: isLarge ? 5 : 15,
@@ -248,7 +247,7 @@ export function buildScenarios(nodeCount: number): BenchmarkScenario[] {
     {
       category: 'Analysis',
       name: 'topologicalSort (DAG)',
-      run: (_graph, meta) => {
+      run: async (_graph, meta) => {
         return meta.dagGraph.topologicalSort();
       },
       iterations: isLarge ? 10 : 30,
@@ -258,7 +257,7 @@ export function buildScenarios(nodeCount: number): BenchmarkScenario[] {
     {
       category: 'Serialization',
       name: 'exportJSON',
-      run: (graph, _meta) => {
+      run: async (graph, _meta) => {
         return graph.exportJSON();
       },
       iterations: isLarge ? 3 : 8,
@@ -268,11 +267,11 @@ export function buildScenarios(nodeCount: number): BenchmarkScenario[] {
     {
       category: 'Serialization',
       name: 'importJSON',
-      setup: (meta) => {
-        // Pre-serialize once; importJSON is the only timed op
-        (meta as GraphMeta & { _serialized?: unknown })._serialized = meta.graph.exportJSON();
+      setup: async (meta) => {
+        const data = await meta.graph.exportJSON();
+        (meta as GraphMeta & { _serialized?: typeof data })._serialized = data;
       },
-      run: (_graph, meta) => {
+      run: async (_graph, meta) => {
         const data = (meta as GraphMeta & { _serialized?: unknown })._serialized as Parameters<typeof Graph.importJSON>[0];
         return Graph.importJSON(data);
       },
@@ -283,28 +282,29 @@ export function buildScenarios(nodeCount: number): BenchmarkScenario[] {
     {
       category: 'Mutation',
       name: 'removeEdge',
-      setup: (meta) => {
-        // Build a disposable graph with fresh edges to remove
+      setup: async (meta) => {
         const g = new Graph();
         const ids: string[] = [];
         const n = 2_000;
         for (let i = 0; i < n; i++) {
-          ids.push(g.addNode('Person', { i }).id);
+          const node = await g.addNode('Person', { i });
+          ids.push(node.id);
         }
         const edgeIds: string[] = [];
         for (let i = 0; i < n - 1; i++) {
-          edgeIds.push(g.addEdge(ids[i], ids[i + 1], 'KNOWS').id);
+          const edge = await g.addEdge(ids[i], ids[i + 1], 'KNOWS');
+          edgeIds.push(edge.id);
         }
         (meta as GraphMeta & { _removeEdgeGraph?: Graph; _removeEdgeIds?: string[] })._removeEdgeGraph = g;
         (meta as GraphMeta & { _removeEdgeGraph?: Graph; _removeEdgeIds?: string[] })._removeEdgeIds = edgeIds;
         return g;
       },
-      run: (_graph, meta) => {
+      run: async (_graph, meta) => {
         const m = meta as GraphMeta & { _removeEdgeGraph?: Graph; _removeEdgeIds?: string[] };
         const ids = m._removeEdgeIds!;
         if (ids.length > 0) {
           const id = ids.pop()!;
-          m._removeEdgeGraph!.removeEdge(id);
+          await m._removeEdgeGraph!.removeEdge(id);
         }
       },
       iterations: 1_000,
@@ -314,27 +314,29 @@ export function buildScenarios(nodeCount: number): BenchmarkScenario[] {
     {
       category: 'Mutation',
       name: 'removeNode (cascade)',
-      setup: (meta) => {
+      setup: async (meta) => {
         const g = new Graph();
         const ids: string[] = [];
         const n = 2_000;
         for (let i = 0; i < n; i++) {
-          ids.push(g.addNode('Person', { i }).id);
+          const node = await g.addNode('Person', { i });
+          ids.push(node.id);
         }
         for (let i = 0; i < n - 1; i++) {
-          g.addEdge(ids[i], ids[i + 1], 'KNOWS');
+          await g.addEdge(ids[i], ids[i + 1], 'KNOWS');
         }
         (meta as GraphMeta & { _removeCascadeGraph?: Graph; _removeCascadeIds?: string[] })._removeCascadeGraph = g;
         (meta as GraphMeta & { _removeCascadeGraph?: Graph; _removeCascadeIds?: string[] })._removeCascadeIds = [...ids];
         return g;
       },
-      run: (_graph, meta) => {
+      run: async (_graph, meta) => {
         const m = meta as GraphMeta & { _removeCascadeGraph?: Graph; _removeCascadeIds?: string[] };
         const ids = m._removeCascadeIds!;
         if (ids.length > 0) {
           const id = ids.pop()!;
-          if (m._removeCascadeGraph!.hasNode(id)) {
-            m._removeCascadeGraph!.removeNode(id, true);
+          const exists = await m._removeCascadeGraph!.hasNode(id);
+          if (exists) {
+            await m._removeCascadeGraph!.removeNode(id, true);
           }
         }
       },
@@ -346,17 +348,21 @@ export function buildScenarios(nodeCount: number): BenchmarkScenario[] {
       category: 'Mutation',
       name: 'clear (full graph)',
       setup: (meta) => {
-        // Each run re-populates and clears a copy — use meta to pass state
         const size = Math.min(1000, Math.floor(meta.nodeCount / 10));
         (meta as GraphMeta & { _clearSize?: number })._clearSize = size;
       },
-      run: (_graph, meta) => {
+      run: async (_graph, meta) => {
         const size = (meta as GraphMeta & { _clearSize?: number })._clearSize!;
         const g = new Graph();
         const ids: string[] = [];
-        for (let i = 0; i < size; i++) ids.push(g.addNode('Person', { i }).id);
-        for (let i = 0; i < size - 1; i++) g.addEdge(ids[i], ids[i + 1], 'KNOWS');
-        g.clear();
+        for (let i = 0; i < size; i++) {
+          const n = await g.addNode('Person', { i });
+          ids.push(n.id);
+        }
+        for (let i = 0; i < size - 1; i++) {
+          await g.addEdge(ids[i], ids[i + 1], 'KNOWS');
+        }
+        await g.clear();
       },
       iterations: isLarge ? 10 : 30,
     },

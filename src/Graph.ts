@@ -15,17 +15,26 @@ export type { TraversalOptions } from './Graph/TraversalOptions';
  * Manages nodes and directed edges with arbitrary JSON properties.
  * Uses adjacency maps and type indexes for O(1) lookups.
  *
+ * All methods are async to support both synchronous in-memory providers
+ * and asynchronous network-based providers (MongoDB, PostgreSQL, etc.)
+ * through a single unified API.
+ *
  * By default uses an in-memory storage provider. Pass a custom
  * IStorageProvider to switch to a file-backed or remote backend.
  *
  * @example
  * // Default in-memory (existing behaviour, unchanged)
  * const graph = new Graph();
+ * const node = await graph.addNode('Person', { name: 'Alice' });
  *
  * @example
- * // Future: file-backed SQLite
- * import { SQLiteStorageProvider } from 'simple-graphdb/storage/sqlite';
- * const graph = new Graph(new SQLiteStorageProvider({ path: './graph.db' }));
+ * // MongoDB-backed graph
+ * import { MongoClient } from 'mongodb';
+ * import { Graph, MongoStorageProvider } from 'simple-graphdb';
+ * const client = new MongoClient('mongodb://localhost:27017');
+ * await client.connect();
+ * const provider = new MongoStorageProvider(client.db('graph'));
+ * const graph = new Graph(provider);
  */
 export class Graph {
   private readonly _index: GraphIndex;
@@ -45,14 +54,14 @@ export class Graph {
   /**
    * Returns all nodes in the graph.
    */
-  getNodes(): readonly Node[] {
+  async getNodes(): Promise<readonly Node[]> {
     return this._index.getNodes();
   }
 
   /**
    * Returns all edges in the graph.
    */
-  getEdges(): readonly Edge[] {
+  async getEdges(): Promise<readonly Edge[]> {
     return this._index.getEdges();
   }
 
@@ -60,7 +69,7 @@ export class Graph {
    * Checks if a node exists in the graph.
    * @param id - Id of the node
    */
-  hasNode(id: string): boolean {
+  async hasNode(id: string): Promise<boolean> {
     return this._index.hasNode(id);
   }
 
@@ -68,7 +77,7 @@ export class Graph {
    * Checks if an edge exists in the graph.
    * @param id - Id of the edge
    */
-  hasEdge(id: string): boolean {
+  async hasEdge(id: string): Promise<boolean> {
     return this._index.hasEdge(id);
   }
 
@@ -78,7 +87,7 @@ export class Graph {
    * @param properties - Optional JSON properties
    * @returns The newly created Node
    */
-  addNode(type: string, properties: Record<string, unknown> = {}): Node {
+  async addNode(type: string, properties: Record<string, unknown> = {}): Promise<Node> {
     return this._index.addNode(type, properties);
   }
 
@@ -88,7 +97,7 @@ export class Graph {
    * @param cascade - If true, also removes all incident edges (default: false)
    * @returns true if the node was removed, false if it didn't exist
    */
-  removeNode(id: string, cascade: boolean = false): boolean {
+  async removeNode(id: string, cascade: boolean = false): Promise<boolean> {
     return this._index.removeNode(id, cascade);
   }
 
@@ -97,7 +106,7 @@ export class Graph {
    * @param id - Id of the node
    * @returns The Node if found, undefined otherwise
    */
-  getNode(id: string): Node | undefined {
+  async getNode(id: string): Promise<Node | undefined> {
     return this._index.getNode(id);
   }
 
@@ -106,7 +115,7 @@ export class Graph {
    * @param type - The node type to filter by
    * @returns Array of Nodes with the specified type
    */
-  getNodesByType(type: string): Node[] {
+  async getNodesByType(type: string): Promise<Node[]> {
     return this._index.getNodesByType(type);
   }
 
@@ -117,7 +126,7 @@ export class Graph {
    * @param options - Optional options with nodeType filter
    * @returns Array of Nodes with the specified property value
    */
-  getNodesByProperty(key: string, value: unknown, options?: { nodeType?: string }): Node[] {
+  async getNodesByProperty(key: string, value: unknown, options?: { nodeType?: string }): Promise<Node[]> {
     return this._index.getNodesByProperty(key, value, options);
   }
 
@@ -129,12 +138,12 @@ export class Graph {
    * @param properties - Optional JSON properties
    * @returns The newly created Edge
    */
-  addEdge(
+  async addEdge(
     sourceId: string,
     targetId: string,
     type: string,
     properties: Record<string, unknown> = {}
-  ): Edge {
+  ): Promise<Edge> {
     return this._index.addEdge(sourceId, targetId, type, properties);
   }
 
@@ -143,7 +152,7 @@ export class Graph {
    * @param id - Id of the edge to remove
    * @returns true if the edge was removed, false if it didn't exist
    */
-  removeEdge(id: string): boolean {
+  async removeEdge(id: string): Promise<boolean> {
     return this._index.removeEdge(id);
   }
 
@@ -152,7 +161,7 @@ export class Graph {
    * @param id - Id of the edge
    * @returns The Edge if found, undefined otherwise
    */
-  getEdge(id: string): Edge | undefined {
+  async getEdge(id: string): Promise<Edge | undefined> {
     return this._index.getEdge(id);
   }
 
@@ -163,7 +172,7 @@ export class Graph {
    * @param options - Optional traversal options with nodeType and edgeType filters
    * @returns Array of parent Nodes
    */
-  getParents(nodeId: string, options?: { nodeType?: string; edgeType?: string }): Node[] {
+  async getParents(nodeId: string, options?: { nodeType?: string; edgeType?: string }): Promise<Node[]> {
     return this._index.getParents(nodeId, options);
   }
 
@@ -174,7 +183,7 @@ export class Graph {
    * @param options - Optional traversal options with nodeType and edgeType filters
    * @returns Array of child Nodes
    */
-  getChildren(nodeId: string, options?: { nodeType?: string; edgeType?: string }): Node[] {
+  async getChildren(nodeId: string, options?: { nodeType?: string; edgeType?: string }): Promise<Node[]> {
     return this._index.getChildren(nodeId, options);
   }
 
@@ -184,7 +193,7 @@ export class Graph {
    * @param options - Optional traversal options with edgeType filter
    * @returns Array of outgoing Edges
    */
-  getEdgesFrom(sourceId: string, options?: { edgeType?: string }): Edge[] {
+  async getEdgesFrom(sourceId: string, options?: { edgeType?: string }): Promise<Edge[]> {
     return this._index.getEdgesFrom(sourceId, options);
   }
 
@@ -194,7 +203,7 @@ export class Graph {
    * @param options - Optional traversal options with edgeType filter
    * @returns Array of incoming Edges
    */
-  getEdgesTo(targetId: string, options?: { edgeType?: string }): Edge[] {
+  async getEdgesTo(targetId: string, options?: { edgeType?: string }): Promise<Edge[]> {
     return this._index.getEdgesTo(targetId, options);
   }
 
@@ -206,7 +215,7 @@ export class Graph {
    * @param options - Optional traversal options with edgeType filter
    * @returns Array of Edges between the nodes
    */
-  getDirectEdgesBetween(sourceId: string, targetId: string, options?: { edgeType?: string }): Edge[] {
+  async getDirectEdgesBetween(sourceId: string, targetId: string, options?: { edgeType?: string }): Promise<Edge[]> {
     return this._index.getDirectEdgesBetween(sourceId, targetId, options);
   }
 
@@ -215,7 +224,7 @@ export class Graph {
    * @param type - The edge type to filter by
    * @returns Array of Edges with the specified type
    */
-  getEdgesByType(type: string): Edge[] {
+  async getEdgesByType(type: string): Promise<Edge[]> {
     return this._index.getEdgesByType(type);
   }
 
@@ -227,11 +236,11 @@ export class Graph {
    * @param options - Traversal options including method, nodeTypes, and edgeTypes filters
    * @returns Array of paths (each path is array of node ids), or null if no paths found
    */
-  traverse(
+  async traverse(
     sourceId: string | string[],
     targetId: string | string[],
     options: TraversalOptions = {}
-  ): string[][] | null {
+  ): Promise<string[][] | null> {
     return this._traversal.traverse(sourceId, targetId, options);
   }
 
@@ -239,7 +248,7 @@ export class Graph {
    * Check if graph is a Directed Acyclic Graph (no cycles).
    * @returns true if the graph has no cycles, false otherwise
    */
-  isDAG(): boolean {
+  async isDAG(): Promise<boolean> {
     return this._traversal.isDAG();
   }
 
@@ -248,15 +257,15 @@ export class Graph {
    * Returns null if the graph is not a DAG (contains cycles).
    * @returns Array of node ids in topological order, or null if graph has cycles
    */
-  topologicalSort(): string[] | null {
+  async topologicalSort(): Promise<string[] | null> {
     return this._traversal.topologicalSort();
   }
 
   /**
    * Removes all nodes and edges from the graph.
    */
-  clear(): void {
-    this._index.clear();
+  async clear(): Promise<void> {
+    return this._index.clear();
   }
 
   // ---------------------------------------------------------------------------
@@ -272,7 +281,7 @@ export class Graph {
    *
    * @returns GraphData snapshot of the current graph state
    */
-  exportJSON(): GraphData {
+  async exportJSON(): Promise<GraphData> {
     return this._adminOps.exportJSON();
   }
 
@@ -284,12 +293,12 @@ export class Graph {
    * correctly.
    *
    * @param data - GraphData to load
+   * @param storageProvider - Optional storage provider (defaults to InMemoryStorageProvider)
    * @returns A new Graph instance with all nodes and edges from the data
    */
-  static importJSON(data: GraphData, storageProvider?: IStorageProvider): Graph {
+  static async importJSON(data: GraphData, storageProvider?: IStorageProvider): Promise<Graph> {
     const graph = new Graph(storageProvider);
-    graph._adminOps.importJSON(data);
+    await graph._adminOps.importJSON(data);
     return graph;
   }
-
 }

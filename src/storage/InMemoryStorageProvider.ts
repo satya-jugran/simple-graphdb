@@ -8,18 +8,40 @@ import {
 import { deepClone } from '../utils';
 
 /**
+ * Configuration options for InMemoryStorageProvider.
+ */
+export interface InMemoryStorageProviderOptions {
+  /**
+   * Graph partition key. Stored for metadata parity with MongoStorageProvider.
+   * @default 'default'
+   */
+  graphId?: string;
+}
+
+/**
  * Default in-memory implementation of IStorageProvider.
  *
  * Uses the same Map / Set structures that GraphIndex previously owned directly.
  * All operations are O(1) amortised (hash-map / set lookups) except
  * getAllNodes() / getAllEdges() which are O(n).
  *
- * This implementation keeps the library fully backward-compatible while
- * establishing the provider abstraction that future file-backed or
- * network-backed providers will implement.
+ * Each instance is naturally scoped to its own Maps — graphId is stored for
+ * metadata parity with MongoStorageProvider.
+ *
+ * All methods are async to satisfy the IStorageProvider contract, but this
+ * implementation resolves immediately (synchronous) — no I/O overhead.
  */
 export class InMemoryStorageProvider implements IStorageProvider {
+  /** Partition key for metadata parity with MongoStorageProvider. */
+  readonly graphId: string;
+
+  constructor(opts: InMemoryStorageProviderOptions = {}) {
+    this.graphId = opts.graphId ?? 'default';
+  }
+
+  // ---------------------------------------------------------------------------
   // Primary stores
+  // ---------------------------------------------------------------------------
   private readonly _nodes = new Map<string, NodeData>();
   private readonly _edges = new Map<string, EdgeData>();
 
@@ -77,7 +99,7 @@ export class InMemoryStorageProvider implements IStorageProvider {
   // Lifecycle
   // ---------------------------------------------------------------------------
 
-  clear(): void {
+  async clear(): Promise<void> {
     this._nodes.clear();
     this._edges.clear();
     this._nodesByType.clear();
@@ -91,7 +113,7 @@ export class InMemoryStorageProvider implements IStorageProvider {
   // Node mutations
   // ---------------------------------------------------------------------------
 
-  insertNode(node: NodeData): void {
+  async insertNode(node: NodeData): Promise<void> {
     this._insertNode(node, false);
   }
 
@@ -113,7 +135,7 @@ export class InMemoryStorageProvider implements IStorageProvider {
     this._indexNodeProperties(stored);
   }
 
-  deleteNode(id: string): void {
+  async deleteNode(id: string): Promise<void> {
     const node = this._nodes.get(id);
     if (!node) return;
 
@@ -134,20 +156,20 @@ export class InMemoryStorageProvider implements IStorageProvider {
   // Node queries
   // ---------------------------------------------------------------------------
 
-  hasNode(id: string): boolean {
+  async hasNode(id: string): Promise<boolean> {
     return this._nodes.has(id);
   }
 
-  getNode(id: string): NodeData | undefined {
+  async getNode(id: string): Promise<NodeData | undefined> {
     const node = this._nodes.get(id);
     return node ? deepClone(node) : undefined;
   }
 
-  getAllNodes(): NodeData[] {
+  async getAllNodes(): Promise<NodeData[]> {
     return Array.from(this._nodes.values()).map(deepClone);
   }
 
-  getNodesByType(type: string): NodeData[] {
+  async getNodesByType(type: string): Promise<NodeData[]> {
     const ids = this._nodesByType.get(type);
     if (!ids) return [];
     return Array.from(ids)
@@ -156,7 +178,7 @@ export class InMemoryStorageProvider implements IStorageProvider {
       .map(deepClone);
   }
 
-  getNodesByProperty(key: string, value: unknown, nodeType?: string): NodeData[] {
+  async getNodesByProperty(key: string, value: unknown, nodeType?: string): Promise<NodeData[]> {
     const serialized = this._propKey(value);
     const valueMap = this._nodesByProperty.get(key);
     if (!valueMap) return [];
@@ -173,7 +195,7 @@ export class InMemoryStorageProvider implements IStorageProvider {
   // Edge mutations
   // ---------------------------------------------------------------------------
 
-  insertEdge(edge: EdgeData): void {
+  async insertEdge(edge: EdgeData): Promise<void> {
     this._insertEdge(edge, false);
   }
 
@@ -203,7 +225,7 @@ export class InMemoryStorageProvider implements IStorageProvider {
     this._edgesByType.get(edge.type)!.add(edge.id);
   }
 
-  deleteEdge(id: string): void {
+  async deleteEdge(id: string): Promise<void> {
     const edge = this._edges.get(id);
     if (!edge) return;
 
@@ -234,20 +256,20 @@ export class InMemoryStorageProvider implements IStorageProvider {
   // Edge queries
   // ---------------------------------------------------------------------------
 
-  hasEdge(id: string): boolean {
+  async hasEdge(id: string): Promise<boolean> {
     return this._edges.has(id);
   }
 
-  getEdge(id: string): EdgeData | undefined {
+  async getEdge(id: string): Promise<EdgeData | undefined> {
     const edge = this._edges.get(id);
     return edge ? deepClone(edge) : undefined;
   }
 
-  getAllEdges(): EdgeData[] {
+  async getAllEdges(): Promise<EdgeData[]> {
     return Array.from(this._edges.values()).map(deepClone);
   }
 
-  getEdgesByType(type: string): EdgeData[] {
+  async getEdgesByType(type: string): Promise<EdgeData[]> {
     const ids = this._edgesByType.get(type);
     if (!ids) return [];
     return Array.from(ids)
@@ -256,7 +278,7 @@ export class InMemoryStorageProvider implements IStorageProvider {
       .map(deepClone);
   }
 
-  getEdgesBySource(nodeId: string): EdgeData[] {
+  async getEdgesBySource(nodeId: string): Promise<EdgeData[]> {
     const ids = this._edgesBySource.get(nodeId);
     if (!ids) return [];
     return Array.from(ids)
@@ -265,7 +287,7 @@ export class InMemoryStorageProvider implements IStorageProvider {
       .map(deepClone);
   }
 
-  getEdgesByTarget(nodeId: string): EdgeData[] {
+  async getEdgesByTarget(nodeId: string): Promise<EdgeData[]> {
     const ids = this._edgesByTarget.get(nodeId);
     if (!ids) return [];
     return Array.from(ids)
@@ -282,8 +304,9 @@ export class InMemoryStorageProvider implements IStorageProvider {
    * Exports all nodes and edges as a portable GraphData snapshot.
    * InMemory strategy: single full iteration — O(n) nodes + O(e) edges.
    */
-  exportJSON(): GraphData {
+  async exportJSON(): Promise<GraphData> {
     return {
+      graphId: this.graphId,
       nodes: Array.from(this._nodes.values()).map(deepClone),
       edges: Array.from(this._edges.values()).map(deepClone),
     };
@@ -297,7 +320,7 @@ export class InMemoryStorageProvider implements IStorageProvider {
    * @throws EdgeAlreadyExistsError if an edge id is already present
    * @throws NodeNotFoundError if an edge references a non-existent node
    */
-  importJSON(data: GraphData): void {
+  async importJSON(data: GraphData): Promise<void> {
     for (const nodeData of data.nodes) {
       // _insertNode throws NodeAlreadyExistsError on duplicate ids
       this._insertNode(nodeData, true);
@@ -315,5 +338,4 @@ export class InMemoryStorageProvider implements IStorageProvider {
       this._insertEdge(edgeData, true);
     }
   }
-
 }

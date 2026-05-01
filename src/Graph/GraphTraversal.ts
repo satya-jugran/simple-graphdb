@@ -7,6 +7,9 @@ import type { TraversalOptions } from './TraversalOptions';
  *
  * Operates directly on IStorageProvider so it works correctly with any
  * storage backend without depending on GraphIndex internals.
+ *
+ * All methods are async to support both synchronous in-memory providers
+ * and asynchronous network-based providers through a unified API.
  */
 export class GraphTraversal {
   constructor(private _store: IStorageProvider) {}
@@ -18,8 +21,12 @@ export class GraphTraversal {
    * @param edgeTypes - Filter for edge types (array with '*' for all, default: ['*'])
    * @returns Array of child node ids that pass the type filters
    */
-  _getTraversableChildren(nodeId: string, nodeTypes: string[] = ['*'], edgeTypes: string[] = ['*']): string[] {
-    const outEdges = this._store.getEdgesBySource(nodeId);
+  private async _getTraversableChildren(
+    nodeId: string,
+    nodeTypes: string[] = ['*'],
+    edgeTypes: string[] = ['*']
+  ): Promise<string[]> {
+    const outEdges = await this._store.getEdgesBySource(nodeId);
     const children: string[] = [];
 
     for (const edge of outEdges) {
@@ -30,7 +37,7 @@ export class GraphTraversal {
       }
 
       // Apply node type filter for target node
-      const targetNode = this._store.getNode(edge.targetId);
+      const targetNode = await this._store.getNode(edge.targetId);
       if (!targetNode) continue;
       const shouldFilterNode = nodeTypes.length > 0 && !nodeTypes.includes('*');
       if (shouldFilterNode && !nodeTypes.includes(targetNode.type)) {
@@ -49,13 +56,18 @@ export class GraphTraversal {
    * @param input - Single ID, '*', or array of IDs
    * @returns Array of node IDs
    */
-  private _normalizeToNodeIds(input: string | string[]): string[] {
-    const allIds = () => this._store.getAllNodes().map(n => n.id);
+  private async _normalizeToNodeIds(input: string | string[]): Promise<string[]> {
     if (Array.isArray(input)) {
-      if (input.length === 0 || input.includes('*')) return allIds();
+      if (input.length === 0 || input.includes('*')) {
+        const all = await this._store.getAllNodes();
+        return all.map(n => n.id);
+      }
       return input;
     }
-    if (input === '*') return allIds();
+    if (input === '*') {
+      const all = await this._store.getAllNodes();
+      return all.map(n => n.id);
+    }
     return [input];
   }
 
@@ -67,20 +79,20 @@ export class GraphTraversal {
    * @param options - Traversal options including method, nodeTypes, and edgeTypes filters
    * @returns Array of paths (each path is array of node ids), or null if no paths found
    */
-  traverse(
+  async traverse(
     sourceId: string | string[],
     targetId: string | string[],
     options: TraversalOptions = {}
-  ): string[][] | null {
-    const sources = this._normalizeToNodeIds(sourceId);
-    const targets = this._normalizeToNodeIds(targetId);
+  ): Promise<string[][] | null> {
+    const sources = await this._normalizeToNodeIds(sourceId);
+    const targets = await this._normalizeToNodeIds(targetId);
 
     const allPaths: string[][] = [];
     const maxResults = options.maxResults ?? 100;
 
     for (const src of sources) {
       for (const tgt of targets) {
-        const path = this._traverseSingle(src, tgt, options);
+        const path = await this._traverseSingle(src, tgt, options);
         if (path !== null) {
           allPaths.push(path);
           if (maxResults && allPaths.length >= maxResults) break;
@@ -99,14 +111,18 @@ export class GraphTraversal {
    * @param options - Traversal options
    * @returns Single path as array of node ids, or null if no path exists
    */
-  private _traverseSingle(
+  private async _traverseSingle(
     sourceId: string,
     targetId: string,
     options: TraversalOptions
-  ): string[] | null {
+  ): Promise<string[] | null> {
     const { method = 'bfs', nodeTypes = ['*'], edgeTypes = ['*'] } = options;
 
-    if (!this._store.hasNode(sourceId) || !this._store.hasNode(targetId)) {
+    const [sourceExists, targetExists] = await Promise.all([
+      this._store.hasNode(sourceId),
+      this._store.hasNode(targetId),
+    ]);
+    if (!sourceExists || !targetExists) {
       return null;
     }
 
@@ -141,7 +157,7 @@ export class GraphTraversal {
       }
 
       // Get children with type filtering
-      const children = this._getTraversableChildren(current, nodeTypes, edgeTypes);
+      const children = await this._getTraversableChildren(current, nodeTypes, edgeTypes);
       for (const childId of children) {
         if (!visited.has(childId)) {
           visited.add(childId);
@@ -159,17 +175,18 @@ export class GraphTraversal {
    * Uses DFS-based cycle detection.
    * @returns true if the graph has no cycles, false otherwise
    */
-  isDAG(): boolean {
+  async isDAG(): Promise<boolean> {
     const visited = new Set<string>();
     const visiting = new Set<string>();
 
-    const hasCycle = (nodeId: string): boolean => {
+    const hasCycle = async (nodeId: string): Promise<boolean> => {
       visited.add(nodeId);
       visiting.add(nodeId);
 
-      for (const childId of this._getTraversableChildren(nodeId)) {
+      const children = await this._getTraversableChildren(nodeId);
+      for (const childId of children) {
         if (!visited.has(childId)) {
-          if (hasCycle(childId)) return true;
+          if (await hasCycle(childId)) return true;
         } else if (visiting.has(childId)) {
           return true;
         }
@@ -179,9 +196,10 @@ export class GraphTraversal {
       return false;
     };
 
-    for (const node of this._store.getAllNodes()) {
+    const nodes = await this._store.getAllNodes();
+    for (const node of nodes) {
       if (!visited.has(node.id)) {
-        if (hasCycle(node.id)) return false;
+        if (await hasCycle(node.id)) return false;
       }
     }
 
@@ -193,9 +211,11 @@ export class GraphTraversal {
    * Returns null if the graph is not a DAG (contains cycles).
    * @returns Array of node ids in topological order, or null if graph has cycles
    */
-  topologicalSort(): string[] | null {
-    const nodes = this._store.getAllNodes();
-    const edges = this._store.getAllEdges();
+  async topologicalSort(): Promise<string[] | null> {
+    const [nodes, edges] = await Promise.all([
+      this._store.getAllNodes(),
+      this._store.getAllEdges(),
+    ]);
 
     const nodeIds = new Set(nodes.map(n => n.id));
 

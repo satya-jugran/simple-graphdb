@@ -4,46 +4,46 @@ import { Graph } from '../../src/index';
 describe('Graph.topologicalSort()', () => {
   let graph: Graph;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     graph = new Graph();
   });
 
-  it('should return empty array for empty graph', () => {
-    const result = graph.topologicalSort();
+  it('should return empty array for empty graph', async () => {
+    const result = await graph.topologicalSort();
     expect(result).toEqual([]);
   });
 
-  it('should return array with single node when no edges', () => {
-    const node = graph.addNode('Test', { name: 'A' });
-    const result = graph.topologicalSort();
+  it('should return array with single node when no edges', async () => {
+    const node = await graph.addNode('Test', { name: 'A' });
+    const result = await graph.topologicalSort();
     expect(result).toEqual([node.id]);
   });
 
-  it('should return nodes in topological order for linear chain', () => {
-    const a = graph.addNode('Test', { name: 'A' });
-    const b = graph.addNode('Test', { name: 'B' });
-    const c = graph.addNode('Test', { name: 'C' });
+  it('should return nodes in topological order for linear chain', async () => {
+    const a = await graph.addNode('Test', { name: 'A' });
+    const b = await graph.addNode('Test', { name: 'B' });
+    const c = await graph.addNode('Test', { name: 'C' });
 
     // A -> B -> C
-    graph.addEdge(a.id, b.id, 'LINKS');
-    graph.addEdge(b.id, c.id, 'LINKS');
+    await graph.addEdge(a.id, b.id, 'LINKS');
+    await graph.addEdge(b.id, c.id, 'LINKS');
 
-    const result = graph.topologicalSort()!;
+    const result = await graph.topologicalSort()!;
     expect(result).toHaveLength(3);
     expect(result.indexOf(a.id)).toBeLessThan(result.indexOf(b.id));
     expect(result.indexOf(b.id)).toBeLessThan(result.indexOf(c.id));
   });
 
-  it('should handle multiple roots (nodes with no incoming edges)', () => {
-    const a = graph.addNode('Test', { name: 'A' });
-    const b = graph.addNode('Test', { name: 'B' });
-    const c = graph.addNode('Test', { name: 'C' });
+  it('should handle multiple roots (nodes with no incoming edges)', async () => {
+    const a = await graph.addNode('Test', { name: 'A' });
+    const b = await graph.addNode('Test', { name: 'B' });
+    const c = await graph.addNode('Test', { name: 'C' });
 
     // A -> C and B -> C (A and B are both roots)
-    graph.addEdge(a.id, c.id, 'LINKS');
-    graph.addEdge(b.id, c.id, 'LINKS');
+    await graph.addEdge(a.id, c.id, 'LINKS');
+    await graph.addEdge(b.id, c.id, 'LINKS');
 
-    const result = graph.topologicalSort()!;
+    const result = await graph.topologicalSort()!;
     expect(result).toHaveLength(3);
     expect(result).toContain(a.id);
     expect(result).toContain(b.id);
@@ -53,45 +53,44 @@ describe('Graph.topologicalSort()', () => {
     expect(result.indexOf(c.id)).toBeGreaterThan(result.indexOf(b.id));
   });
 
-  it('should return null for graph with cycle', () => {
-    const a = graph.addNode('Test', { name: 'A' });
-    const b = graph.addNode('Test', { name: 'B' });
-    const c = graph.addNode('Test', { name: 'C' });
+  it('should return null for graph with cycle', async () => {
+    const a = await graph.addNode('Test', { name: 'A' });
+    const b = await graph.addNode('Test', { name: 'B' });
+    const c = await graph.addNode('Test', { name: 'C' });
 
     // A -> B -> C -> A (cycle)
-    graph.addEdge(a.id, b.id, 'LINKS');
-    graph.addEdge(b.id, c.id, 'LINKS');
-    graph.addEdge(c.id, a.id, 'LINKS');
+    await graph.addEdge(a.id, b.id, 'LINKS');
+    await graph.addEdge(b.id, c.id, 'LINKS');
+    await graph.addEdge(c.id, a.id, 'LINKS');
 
-    const result = graph.topologicalSort();
+    const result = await graph.topologicalSort();
     expect(result).toBeNull();
   });
 
-  it('should return null for self-referencing cycle', () => {
-    const a = graph.addNode('Test', { name: 'A' });
-    const b = graph.addNode('Test', { name: 'B' });
+  it('should return null for self-referencing cycle', async () => {
+    const a = await graph.addNode('Test', { name: 'A' });
 
     // A -> A (self-loop)
-    graph.addEdge(a.id, a.id, 'LINKS');
+    await graph.addEdge(a.id, a.id, 'LINKS');
 
-    const result = graph.topologicalSort();
+    const result = await graph.topologicalSort();
     expect(result).toBeNull();
   });
 
-  it('should handle diamond dependency structure', () => {
-    const a = graph.addNode('Test', { name: 'A' });
-    const b = graph.addNode('Test', { name: 'B' });
-    const c = graph.addNode('Test', { name: 'C' });
-    const d = graph.addNode('Test', { name: 'D' });
+  it('should handle diamond dependency structure', async () => {
+    const a = await graph.addNode('Test', { name: 'A' });
+    const b = await graph.addNode('Test', { name: 'B' });
+    const c = await graph.addNode('Test', { name: 'C' });
+    const d = await graph.addNode('Test', { name: 'D' });
 
     // A -> B -> D
     // A -> C -> D
-    graph.addEdge(a.id, b.id, 'LINKS');
-    graph.addEdge(b.id, d.id, 'LINKS');
-    graph.addEdge(a.id, c.id, 'LINKS');
-    graph.addEdge(c.id, d.id, 'LINKS');
+    await graph.addEdge(a.id, b.id, 'LINKS');
+    await graph.addEdge(b.id, d.id, 'LINKS');
+    await graph.addEdge(a.id, c.id, 'LINKS');
+    await graph.addEdge(c.id, d.id, 'LINKS');
 
-    const result = graph.topologicalSort()!;
+    const result = await graph.topologicalSort()!;
     expect(result).toHaveLength(4);
     // A must come before both B and C
     expect(result.indexOf(a.id)).toBeLessThan(result.indexOf(b.id));
@@ -101,30 +100,30 @@ describe('Graph.topologicalSort()', () => {
     expect(result.indexOf(c.id)).toBeLessThan(result.indexOf(d.id));
   });
 
-  it('should handle isolated nodes (no edges)', () => {
-    const a = graph.addNode('Test', { name: 'A' });
-    const b = graph.addNode('Test', { name: 'B' });
-    const c = graph.addNode('Test', { name: 'C' });
+  it('should handle isolated nodes (no edges)', async () => {
+    const a = await graph.addNode('Test', { name: 'A' });
+    const b = await graph.addNode('Test', { name: 'B' });
+    const c = await graph.addNode('Test', { name: 'C' });
 
-    const result = graph.topologicalSort();
+    const result = await graph.topologicalSort();
     expect(result).toHaveLength(3);
     expect(result).toContain(a.id);
     expect(result).toContain(b.id);
     expect(result).toContain(c.id);
   });
 
-  it('should correctly sort after cascade-removing a middle node', () => {
-    const a = graph.addNode('Test', { name: 'A' });
-    const b = graph.addNode('Test', { name: 'B' });
-    const c = graph.addNode('Test', { name: 'C' });
+  it('should correctly sort after cascade-removing a middle node', async () => {
+    const a = await graph.addNode('Test', { name: 'A' });
+    const b = await graph.addNode('Test', { name: 'B' });
+    const c = await graph.addNode('Test', { name: 'C' });
 
-    graph.addEdge(a.id, b.id, 'LINKS');
-    graph.addEdge(b.id, c.id, 'LINKS');
+    await graph.addEdge(a.id, b.id, 'LINKS');
+    await graph.addEdge(b.id, c.id, 'LINKS');
 
     // Remove B with cascade — both incident edges are also removed
-    graph.removeNode(b.id, true);
+    await graph.removeNode(b.id, true);
 
-    const result = graph.topologicalSort();
+    const result = await graph.topologicalSort();
     expect(result).toHaveLength(2);
     expect(result).toContain(a.id);
     expect(result).toContain(c.id);

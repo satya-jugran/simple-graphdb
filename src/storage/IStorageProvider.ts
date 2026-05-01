@@ -3,9 +3,9 @@ import type { NodeData, EdgeData, GraphData } from '../types';
 /**
  * Contract that every storage backend must fulfill.
  *
- * All methods are synchronous in this version (v4.x).
- * An async variant (`IAsyncStorageProvider`) will be introduced in v5.0
- * to support MongoDB, PostgreSQL, and other network-based backends.
+ * All methods are async (v5.0+) to support both synchronous in-memory providers
+ * and asynchronous network-based providers (MongoDB, PostgreSQL, etc.) through
+ * a single unified API.
  *
  * Index responsibilities:
  *  - Type index  (node/edge type → id set)
@@ -18,8 +18,7 @@ import type { NodeData, EdgeData, GraphData } from '../types';
  * Data portability:
  *  - exportJSON() / importJSON() are part of the provider contract so that
  *    each backend can implement the most efficient strategy for its storage
- *    model (e.g. full iteration for in-memory, batched cursor reads for
- *    SQLite/LMDB, aggregation pipeline for MongoDB).
+ *    model (e.g. full iteration for in-memory, bulkWrite for MongoDB).
  */
 export interface IStorageProvider {
   // ---------------------------------------------------------------------------
@@ -29,7 +28,7 @@ export interface IStorageProvider {
   /**
    * Remove all stored nodes, edges, and index data.
    */
-  clear(): void;
+  clear(): Promise<void>;
 
   // ---------------------------------------------------------------------------
   // Node mutations
@@ -39,40 +38,40 @@ export interface IStorageProvider {
    * Persist a node.  The node is identified by `node.id`.
    * Must update: node store, type index, property value index.
    */
-  insertNode(node: NodeData): void;
+  insertNode(node: NodeData): Promise<void>;
 
   /**
    * Remove a node by id.
    * Must update: node store, type index, property value index.
    * Does NOT touch edges — the caller (GraphIndex) handles cascade logic.
    */
-  deleteNode(id: string): void;
+  deleteNode(id: string): Promise<void>;
 
   // ---------------------------------------------------------------------------
   // Node queries
   // ---------------------------------------------------------------------------
 
   /** Returns true if a node with the given id exists. */
-  hasNode(id: string): boolean;
+  hasNode(id: string): Promise<boolean>;
 
   /** Returns the NodeData for the given id, or undefined if not found. */
-  getNode(id: string): NodeData | undefined;
+  getNode(id: string): Promise<NodeData | undefined>;
 
   /** Returns all stored nodes. */
-  getAllNodes(): NodeData[];
+  getAllNodes(): Promise<NodeData[]>;
 
   /**
    * Returns all nodes whose `type` field matches the given value.
    * Implementations must use an index (not a full scan).
    */
-  getNodesByType(type: string): NodeData[];
+  getNodesByType(type: string): Promise<NodeData[]>;
 
   /**
    * Returns all nodes that have a property `key` equal to `value`.
    * Optionally filtered to a specific node type.
    * Implementations must use an index (not a full scan).
    */
-  getNodesByProperty(key: string, value: unknown, nodeType?: string): NodeData[];
+  getNodesByProperty(key: string, value: unknown, nodeType?: string): Promise<NodeData[]>;
 
   // ---------------------------------------------------------------------------
   // Edge mutations
@@ -82,44 +81,44 @@ export interface IStorageProvider {
    * Persist an edge.  The edge is identified by `edge.id`.
    * Must update: edge store, edge-type index, adjacency indexes (source + target).
    */
-  insertEdge(edge: EdgeData): void;
+  insertEdge(edge: EdgeData): Promise<void>;
 
   /**
    * Remove an edge by id.
    * Must update: edge store, edge-type index, adjacency indexes (source + target).
    */
-  deleteEdge(id: string): void;
+  deleteEdge(id: string): Promise<void>;
 
   // ---------------------------------------------------------------------------
   // Edge queries
   // ---------------------------------------------------------------------------
 
   /** Returns true if an edge with the given id exists. */
-  hasEdge(id: string): boolean;
+  hasEdge(id: string): Promise<boolean>;
 
   /** Returns the EdgeData for the given id, or undefined if not found. */
-  getEdge(id: string): EdgeData | undefined;
+  getEdge(id: string): Promise<EdgeData | undefined>;
 
   /** Returns all stored edges. */
-  getAllEdges(): EdgeData[];
+  getAllEdges(): Promise<EdgeData[]>;
 
   /**
    * Returns all edges whose `type` field matches the given value.
    * Implementations must use an index (not a full scan).
    */
-  getEdgesByType(type: string): EdgeData[];
+  getEdgesByType(type: string): Promise<EdgeData[]>;
 
   /**
    * Returns all edges whose `sourceId` equals the given node id.
    * Implementations must use an adjacency index (not a full scan).
    */
-  getEdgesBySource(nodeId: string): EdgeData[];
+  getEdgesBySource(nodeId: string): Promise<EdgeData[]>;
 
   /**
    * Returns all edges whose `targetId` equals the given node id.
    * Implementations must use an adjacency index (not a full scan).
    */
-  getEdgesByTarget(nodeId: string): EdgeData[];
+  getEdgesByTarget(nodeId: string): Promise<EdgeData[]>;
 
   // ---------------------------------------------------------------------------
   // Data portability
@@ -130,19 +129,17 @@ export interface IStorageProvider {
    *
    * Implementations choose the most efficient strategy for their backing store:
    *  - InMemory: single full iteration over node/edge maps
-   *  - SQLite / LMDB: cursor-based paged reads
    *  - MongoDB: aggregation pipeline
    *
    * @returns GraphData snapshot of the current graph state
    */
-  exportJSON(): GraphData;
+  exportJSON(): Promise<GraphData>;
 
   /**
    * Imports graph data from a portable JSON object into the backing store.
    *
    * Implementations choose the most efficient strategy:
    *  - InMemory: single pass insert
-   *  - SQLite / LMDB: batched transaction inserts
    *  - MongoDB: bulkWrite operations
    *
    * The implementation is responsible for referential integrity validation
@@ -153,5 +150,5 @@ export interface IStorageProvider {
    * @throws EdgeAlreadyExistsError if an edge id is already present
    * @throws NodeNotFoundError if an edge references a non-existent node
    */
-  importJSON(data: GraphData): void;
+  importJSON(data: GraphData): Promise<void>;
 }

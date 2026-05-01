@@ -1,7 +1,7 @@
 {
   "name": "simple-graphdb",
-  "version": "4.0.0",
-  "description": "A lightweight graph database for TypeScript with a pluggable storage provider architecture, support for directed/undirected graphs, BFS/DFS traversal, topological sort, DAG detection, and Mermaid diagram export.",
+  "version": "5.0.0",
+  "description": "A lightweight async-first graph database for TypeScript with a pluggable storage provider architecture (InMemory, MongoDB), BFS/DFS traversal, topological sort, DAG detection, and Mermaid diagram export.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
@@ -17,7 +17,9 @@
     "graph",
     "database",
     "in-memory",
+    "mongodb",
     "typescript",
+    "async",
     "traversal",
     "graph-database",
     "graph-data-structure",
@@ -26,6 +28,14 @@
     "topological-sort",
     "mermaid"
   ],
+  "peerDependencies": {
+    "mongodb": ">=5.0.0"
+  },
+  "peerDependenciesMeta": {
+    "mongodb": {
+      "optional": true
+    }
+  },
   "author": "Satya Jugran",
   "license": "MIT",
   "repository": {
@@ -37,6 +47,8 @@
     "@types/node": "^25.6.0",
     "cross-env": "^10.1.0",
     "jest": "^29.5.0",
+    "mongodb": "^7.2.0",
+    "mongodb-memory-server": "^11.1.0",
     "rimraf": "^5.0.0",
     "ts-jest": "^29.1.0",
     "ts-node": "^10.9.0",

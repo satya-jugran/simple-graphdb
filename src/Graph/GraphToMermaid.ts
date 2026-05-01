@@ -22,19 +22,12 @@ export interface MermaidOptions {
 
 /**
  * Converts a Graph to Mermaid diagram syntax for visualization.
- * Supports both Graph instances and serialized JSON data.
+ * Supports Graph instances (via async factory method) and serialized JSON data.
  */
 export class GraphToMermaid {
   private readonly _graphData: GraphData;
   private readonly _options: Required<MermaidOptions>;
   private readonly _usedIds: Set<string> = new Set();
-
-  /**
-   * Creates a new GraphToMermaid converter from a Graph instance.
-   * @param graph - The Graph to convert
-   * @param options - Optional configuration options
-   */
-  constructor(graph: Graph, options?: MermaidOptions);
 
   /**
    * Creates a new GraphToMermaid converter from a JSON string.
@@ -43,10 +36,17 @@ export class GraphToMermaid {
    */
   constructor(jsonString: string, options?: MermaidOptions);
 
-  constructor(graphOrJson: Graph | string, options?: MermaidOptions) {
-    if (typeof graphOrJson === 'string') {
+  /**
+   * Creates a GraphToMermaid from a GraphData object (synchronous).
+   * @param data - GraphData to convert
+   * @param options - Optional configuration options
+   */
+  constructor(data: GraphData, options?: MermaidOptions);
+
+  constructor(dataOrJson: GraphData | string, options?: MermaidOptions) {
+    if (typeof dataOrJson === 'string') {
       try {
-        const parsed = JSON.parse(graphOrJson);
+        const parsed = JSON.parse(dataOrJson);
         this._validateGraphData(parsed);
         this._graphData = parsed;
       } catch (e) {
@@ -56,7 +56,7 @@ export class GraphToMermaid {
         throw e;
       }
     } else {
-      this._graphData = graphOrJson.exportJSON();
+      this._graphData = dataOrJson;
     }
 
     this._options = {
@@ -64,6 +64,17 @@ export class GraphToMermaid {
       includeEdgeLabels: options?.includeEdgeLabels ?? true,
       direction: options?.direction ?? 'TD',
     };
+  }
+
+  /**
+   * Creates a GraphToMermaid from a Graph instance.
+   * Use this instead of the constructor when passing a Graph.
+   * @param graph - The Graph to convert
+   * @param options - Optional configuration options
+   */
+  static async fromGraph(graph: Graph, options?: MermaidOptions): Promise<GraphToMermaid> {
+    const data = await graph.exportJSON();
+    return new GraphToMermaid(data, options);
   }
 
   /**

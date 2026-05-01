@@ -7,9 +7,9 @@ export interface BenchmarkScenario {
   name: string;
   category: string;
   /** Called once before timing starts. Graph mutations go here. NOT timed. */
-  setup?: (meta: GraphMeta) => Graph | void;
+  setup?: (meta: GraphMeta) => Graph | void | Promise<Graph | void>;
   /** The operation being benchmarked. Called `iterations` times. */
-  run: (graph: Graph, meta: GraphMeta) => unknown;
+  run: (graph: Graph, meta: GraphMeta) => unknown | Promise<unknown>;
   iterations: number;
 }
 
@@ -27,16 +27,16 @@ export interface BenchmarkResult {
 
 // ─── Core runner ─────────────────────────────────────────────────────────────
 
-export function runScenario(
+export async function runScenario(
   scenario: BenchmarkScenario,
   meta: GraphMeta,
-): BenchmarkResult {
+): Promise<BenchmarkResult> {
   const { name, category, setup, run, iterations } = scenario;
 
   // Run setup (untimed)
   let workingGraph: Graph = meta.graph;
   if (setup) {
-    const result = setup(meta);
+    const result = await setup(meta);
     if (result instanceof Graph) workingGraph = result;
   }
 
@@ -45,13 +45,13 @@ export function runScenario(
   const heapBefore = process.memoryUsage().heapUsed;
 
   // Warmup: 1 iteration (not counted)
-  run(workingGraph, meta);
+  await run(workingGraph, meta);
 
   // Timed iterations
   const times: number[] = [];
   for (let i = 0; i < iterations; i++) {
     const t0 = process.hrtime.bigint();
-    run(workingGraph, meta);
+    await run(workingGraph, meta);
     const t1 = process.hrtime.bigint();
     times.push(Number(t1 - t0) / 1_000_000); // ns → ms
   }

@@ -1,11 +1,24 @@
 # simple-graphdb
 
-A lightweight graph database for TypeScript with a **pluggable storage provider architecture**, support for directed/undirected graphs, BFS/DFS traversal, topological sort, DAG detection, and Mermaid diagram export.
+A lightweight **async-first** graph database for TypeScript with a **pluggable storage provider architecture** — works in-memory out of the box, and plugs into MongoDB (or any custom backend) with zero API changes.
+
+Features:
+- Directed graphs with typed nodes and edges
+- BFS / DFS traversal with wildcard & array sources/targets
+- Type and property filtering during traversal
+- Topological sort & DAG detection
+- Mermaid diagram export
+- Fully async API — every method returns `Promise<T>`
+- `InMemoryStorageProvider` (built-in, zero dependencies)
+- `MongoStorageProvider` (optional, requires `mongodb >= 5`)
 
 ## Installation
 
 ```bash
 npm install simple-graphdb
+
+# MongoDB backend (optional)
+npm install mongodb
 ```
 
 ## Quick Start
@@ -13,99 +26,177 @@ npm install simple-graphdb
 ```typescript
 import { Graph } from 'simple-graphdb';
 
-// Create a new graph
+// Create a new graph (uses InMemoryStorageProvider by default)
 const graph = new Graph();
 
-// Add nodes with type and properties
-const pythonCourse = graph.addNode('Course', { name: 'Python', duration: 40 });
-const chapter1 = graph.addNode('Chapter', { name: 'Basics', order: 1 });
-const author = graph.addNode('Author', { name: 'John Doe' });
+// Add nodes — all methods are async, use await
+const pythonCourse = await graph.addNode('Course', { name: 'Python', duration: 40 });
+const chapter1     = await graph.addNode('Chapter', { name: 'Basics', order: 1 });
+const author       = await graph.addNode('Author', { name: 'John Doe' });
 
 // Add directed edges with relationship types
-graph.addEdge(pythonCourse.id, chapter1.id, 'CONTAINS');
-graph.addEdge(author.id, pythonCourse.id, 'AUTHOR_OF');
+await graph.addEdge(pythonCourse.id, chapter1.id, 'CONTAINS');
+await graph.addEdge(author.id, pythonCourse.id, 'AUTHOR_OF');
 
 // Navigate the graph
-const chapters = graph.getChildren(pythonCourse.id);  // [chapter1]
-const courses = graph.getParents(author.id);         // [pythonCourse]
+const chapters = await graph.getChildren(pythonCourse.id);  // [chapter1]
+const courses  = await graph.getParents(author.id);         // [pythonCourse]
 
 // Find nodes by type
-const courses = graph.getNodesByType('Course');
+const allCourses = await graph.getNodesByType('Course');
 
 // Find path between nodes
-const paths = graph.traverse(pythonCourse.id, chapter1.id, { method: 'bfs' }); // [[courseId, chapterId]]
+const paths = await graph.traverse(pythonCourse.id, chapter1.id, { method: 'bfs' });
+// [[courseId, chapterId]]
 
 // Type-filtered traversal
-const personPaths = graph.traverse(author.id, pythonCourse.id, {
+const filtered = await graph.traverse(author.id, pythonCourse.id, {
   nodeTypes: ['Author'],
   edgeTypes: ['AUTHOR_OF']
 });
 
-// Wildcard traversal - find all authors of a course
-const authors = graph.traverse('*', pythonCourse.id, {
+// Wildcard traversal — find all authors of a course
+const authorPaths = await graph.traverse('*', pythonCourse.id, {
   edgeTypes: ['AUTHOR_OF']
-}); // [[authorId1, courseId], [authorId2, courseId]]
+});
+// [[authorId1, courseId], [authorId2, courseId], ...]
 
 // Find all reachable nodes from a source
-const allPaths = graph.traverse(pythonCourse.id, '*'); // [[courseId, child1], [courseId, child2], ...]
+const allPaths = await graph.traverse(pythonCourse.id, '*');
+// [[courseId, child1], [courseId, child2], ...]
 
 // Check if graph is a DAG
-graph.isDAG(); // true
+const dag = await graph.isDAG(); // true
+
+// Topological sort
+const order = await graph.topologicalSort(); // [authorId, courseId, chapterId]
 ```
+
+## MongoDB Backend
+
+```typescript
+import { MongoClient } from 'mongodb';
+import { MongoGraphFactory } from 'simple-graphdb';
+
+// Connect to MongoDB
+const client = new MongoClient('mongodb://localhost:27017');
+await client.connect();
+
+const factory = new MongoGraphFactory(client.db('mydb'));
+
+// Create indexes once at startup (idempotent — safe to call every time)
+await factory.ensureIndexes();
+
+// Get a graph scoped to a named partition
+const graph = factory.forGraph('my-graph');
+
+const alice = await graph.addNode('Person', { name: 'Alice' });
+const bob   = await graph.addNode('Person', { name: 'Bob' });
+await graph.addEdge(alice.id, bob.id, 'KNOWS');
+
+const path = await graph.traverse(alice.id, bob.id, { edgeTypes: ['KNOWS'] });
+
+// Caller manages the MongoClient lifecycle
+await client.close();
+```
+
+### Direct `MongoStorageProvider` Usage
+
+For fine-grained control over collection names, construct the provider directly:
+
+```typescript
+import { MongoClient } from 'mongodb';
+import { Graph, MongoStorageProvider } from 'simple-graphdb';
+
+const client = new MongoClient('mongodb://localhost:27017');
+await client.connect();
+
+const provider = new MongoStorageProvider(client.db('mydb'), {
+  graphId: 'my-graph',          // default: 'default' — partitions data by graph id
+  nodesCollection: 'my_nodes',  // default: 'sgdb_nodes'
+  edgesCollection: 'my_edges',  // default: 'sgdb_edges'
+});
+
+await provider.ensureIndexes();
+
+const graph = new Graph(provider);
+```
+
+### Indexes Created by `ensureIndexes()`
+
+| Collection | Index | Purpose |
+|-----------|-------|---------|
+| nodes | `{ graphId: 1, id: 1 }` unique | Fast node id lookups within a graph partition |
+| nodes | `{ graphId: 1, type: 1 }` | `getNodesByType()` within a graph partition |
+| nodes | `{ graphId: 1, properties: 1 }` | Property value lookups within a graph partition |
+| edges | `{ graphId: 1, id: 1 }` unique | Fast edge id lookups within a graph partition |
+| edges | `{ graphId: 1, type: 1 }` | `getEdgesByType()` within a graph partition |
+| edges | `{ graphId: 1, sourceId: 1, type: 1 }` | Outgoing adjacency queries |
+| edges | `{ graphId: 1, targetId: 1, type: 1 }` | Incoming adjacency queries |
 
 ## API Reference
 
+All methods return `Promise<T>` — remember to `await` every call.
+
 ### Graph Class
+
+#### Constructor
+
+```typescript
+new Graph(storageProvider?: IStorageProvider)
+```
+
+Omit `storageProvider` to use the built-in `InMemoryStorageProvider`.
 
 #### Node Operations
 
-| Method | Description |
-|--------|-------------|
-| `addNode(type: string, properties?: Record<string, unknown>): Node` | Add a new node with type label |
-| `removeNode(id: string, cascade?: boolean): boolean` | Remove node; cascade removes incident edges |
-| `getNode(id: string): Node \| undefined` | Get node by id |
-| `hasNode(id: string): boolean` | Check if node exists |
-| `getNodes(): readonly Node[]` | Get all nodes |
-| `getNodesByType(type: string): Node[]` | Get all nodes of a given type |
-| `getNodesByProperty(key: string, value: unknown, options?: { nodeType?: string }): Node[]` | Get nodes by property value, optionally filtered by node type |
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `addNode(type, properties?)` | `Promise<Node>` | Add a new node with type label |
+| `removeNode(id, cascade?)` | `Promise<boolean>` | Remove node; `cascade=true` removes incident edges |
+| `getNode(id)` | `Promise<Node \| undefined>` | Get node by id |
+| `hasNode(id)` | `Promise<boolean>` | Check if node exists |
+| `getNodes()` | `Promise<readonly Node[]>` | Get all nodes |
+| `getNodesByType(type)` | `Promise<Node[]>` | Get all nodes of a given type |
+| `getNodesByProperty(key, value, opts?)` | `Promise<Node[]>` | Get nodes by property value, optionally filtered by node type |
 
 #### Edge Operations
 
-| Method | Description |
-|--------|-------------|
-| `addEdge(sourceId: string, targetId: string, type: string, properties?: Record<string, unknown>): Edge` | Add a directed edge with relationship type |
-| `removeEdge(id: string): boolean` | Remove edge by id |
-| `getEdge(id: string): Edge \| undefined` | Get edge by id |
-| `hasEdge(id: string): boolean` | Check if edge exists |
-| `getEdges(): readonly Edge[]` | Get all edges |
-| `getEdgesByType(type: string): Edge[]` | Get all edges of a given relationship type |
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `addEdge(sourceId, targetId, type, properties?)` | `Promise<Edge>` | Add a directed edge with relationship type |
+| `removeEdge(id)` | `Promise<boolean>` | Remove edge by id |
+| `getEdge(id)` | `Promise<Edge \| undefined>` | Get edge by id |
+| `hasEdge(id)` | `Promise<boolean>` | Check if edge exists |
+| `getEdges()` | `Promise<readonly Edge[]>` | Get all edges |
+| `getEdgesByType(type)` | `Promise<Edge[]>` | Get all edges of a given relationship type |
 
 #### Navigation
 
-| Method | Description |
-|--------|-------------|
-| `getParents(nodeId: string, options?: { nodeType?: string; edgeType?: string }): Node[]` | Get parent nodes with optional type filters |
-| `getChildren(nodeId: string, options?: { nodeType?: string; edgeType?: string }): Node[]` | Get child nodes with optional type filters |
-| `getEdgesFrom(sourceId: string, options?: { edgeType?: string }): Edge[]` | Get outgoing edges with optional type filter |
-| `getEdgesTo(targetId: string, options?: { edgeType?: string }): Edge[]` | Get incoming edges with optional type filter |
-| `getDirectEdgesBetween(sourceId: string, targetId: string, options?: { edgeType?: string }): Edge[]` | Get direct edges between two nodes |
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `getParents(nodeId, opts?)` | `Promise<Node[]>` | Get parent nodes with optional type filters |
+| `getChildren(nodeId, opts?)` | `Promise<Node[]>` | Get child nodes with optional type filters |
+| `getEdgesFrom(sourceId, opts?)` | `Promise<Edge[]>` | Get outgoing edges with optional type filter |
+| `getEdgesTo(targetId, opts?)` | `Promise<Edge[]>` | Get incoming edges with optional type filter |
+| `getDirectEdgesBetween(sourceId, targetId, opts?)` | `Promise<Edge[]>` | Get direct edges between two nodes |
 
 #### Traversal & Analysis
 
-| Method | Description |
-|--------|-------------|
-| `traverse(sourceId: string \| string[], targetId: string \| string[], options?: TraversalOptions): string[][] \| null` | Find path(s) between the given source and target node(s), using the selected `method` and optional `nodeTypes` and `edgeTypes` filters |
-| `isDAG(): boolean` | Check if graph is a Directed Acyclic Graph |
-| `topologicalSort(): string[] \| null` | Get nodes in topological order (DAGs only); returns null if cycles exist |
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `traverse(sourceId, targetId, opts?)` | `Promise<string[][] \| null>` | Find path(s) between nodes using BFS or DFS |
+| `isDAG()` | `Promise<boolean>` | Check if graph is a Directed Acyclic Graph |
+| `topologicalSort()` | `Promise<string[] \| null>` | Topological order; `null` if cycles exist |
 
 #### TraversalOptions Interface
 
 ```typescript
 interface TraversalOptions {
-  method?: 'bfs' | 'dfs';           // default: 'bfs'
-  nodeTypes?: string[];              // filter by node types (['*'] = all, default)
-  edgeTypes?: string[];              // filter by edge types (['*'] = all, default)
-  maxResults?: number;              // limit number of paths returned (default: 100)
+  method?: 'bfs' | 'dfs';    // default: 'bfs'
+  nodeTypes?: string[];       // filter traversal to these node types (default: all)
+  edgeTypes?: string[];       // filter traversal to these edge types (default: all)
+  maxResults?: number;        // limit number of paths (default: 100)
 }
 ```
 
@@ -114,48 +205,45 @@ interface TraversalOptions {
 The `traverse()` method supports wildcards for flexible path finding:
 
 ```typescript
-// Find a path to a specific target from each matching source
-graph.traverse('*', targetId);
+// Find a path to a specific target from every node
+await graph.traverse('*', targetId);
 
-// Find a path from a specific source to each reachable target
-graph.traverse(sourceId, '*');
+// Find a path from a specific source to every reachable target
+await graph.traverse(sourceId, '*');
 
-// Find a representative path for each matching source/target pair in the graph
-graph.traverse('*', '*');
+// Find paths for every source/target pair in the graph
+await graph.traverse('*', '*');
 
-// Find a path for each matching source/target combination
-graph.traverse(['id1', 'id2'], ['id3', 'id4']);
+// Find paths for each combination across two arrays
+await graph.traverse(['id1', 'id2'], ['id3', 'id4']);
 ```
 
 #### Serialization & Admin
 
-| Method | Description |
-|--------|-------------|
-| `exportJSON(): GraphData` | Serialize graph to a JSON-compatible object |
-| `static importJSON(data: GraphData, storageProvider?: IStorageProvider): Graph` | Reconstruct a graph from data with optional custom storage provider |
-| `clear(): void` | Remove all nodes and edges |
-| `toJSON(): GraphData` | ⚠️ Deprecated — use `exportJSON()` |
-| `static fromJSON(data: GraphData): Graph` | ⚠️ Deprecated — use `importJSON()` |
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `exportJSON()` | `Promise<GraphData>` | Serialize graph to JSON-compatible object |
+| `static importJSON(data, storageProvider?)` | `Promise<Graph>` | Reconstruct graph from data |
+| `clear()` | `Promise<void>` | Remove all nodes and edges |
 
-### GraphToMermaid - Mermaid Diagram Generation
+### GraphToMermaid — Mermaid Diagram Generation
 
 Convert your graph to Mermaid flowchart syntax for visualization:
 
 ```typescript
 import { Graph, GraphToMermaid } from 'simple-graphdb';
 
-// Create a simple social graph
 const graph = new Graph();
-const alice = graph.addNode('Person', { name: 'Alice' });
-const bob = graph.addNode('Person', { name: 'Bob' });
-const carol = graph.addNode('Person', { name: 'Carol' });
+const alice = await graph.addNode('Person', { name: 'Alice' });
+const bob   = await graph.addNode('Person', { name: 'Bob' });
+const carol = await graph.addNode('Person', { name: 'Carol' });
 
-graph.addEdge(alice.id, bob.id, 'KNOWS');
-graph.addEdge(bob.id, carol.id, 'KNOWS');
-graph.addEdge(alice.id, carol.id, 'FRIEND_OF');
+await graph.addEdge(alice.id, bob.id, 'KNOWS');
+await graph.addEdge(bob.id, carol.id, 'KNOWS');
+await graph.addEdge(alice.id, carol.id, 'FRIEND_OF');
 
-// Generate Mermaid diagram
-const mermaid = new GraphToMermaid(graph);
+// Async static factory — awaits graph.exportJSON() internally
+const mermaid = await GraphToMermaid.fromGraph(graph);
 console.log(mermaid.toString());
 ```
 
@@ -170,143 +258,168 @@ flowchart TD
     abc123 -->|"FRIEND_OF"| ghi789
 ```
 
+You can also construct from serialized JSON synchronously:
+
+```typescript
+const json = await graph.exportJSON();
+const mermaid = new GraphToMermaid(JSON.stringify(json));
+// or
+const mermaid2 = new GraphToMermaid(json);
+```
+
 #### GraphToMermaid Options
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `showProperties` | `boolean` | `false` | Include node properties in labels |
 | `includeEdgeLabels` | `boolean` | `true` | Show edge types on arrows |
-| `direction` | `'TD' \\| 'LR'` | `'TD'` | Flowchart direction (top-down or left-right) |
+| `direction` | `'TD' \| 'LR'` | `'TD'` | Flowchart direction (top-down or left-right) |
 
 ```typescript
-// With custom options
-const mermaid = new GraphToMermaid(graph, {
+const mermaid = await GraphToMermaid.fromGraph(graph, {
   showProperties: true,
   includeEdgeLabels: true,
-  direction: 'LR'  // left-to-right layout
+  direction: 'LR'
 });
-```
-
-You can also create GraphToMermaid from JSON data:
-
-```typescript
-const jsonData = graph.toJSON();
-const mermaid = new GraphToMermaid(JSON.stringify(jsonData));
 ```
 
 ### Node Class
 
 ```typescript
-const node = graph.addNode('Course', { name: 'Python', duration: 40 });
+const node = await graph.addNode('Course', { name: 'Python', duration: 40 });
 
 node.id;         // 'uuid-xxxx-xxxx'
 node.type;       // 'Course'
 node.properties; // { name: 'Python', duration: 40 }
-node.toJSON();   // { id: '...', type: 'Course', properties: { name: 'Python', duration: 40 } }
+node.toJSON();   // { id: '...', type: 'Course', properties: { ... } }
 ```
 
 ### Edge Class
 
 ```typescript
-const edge = graph.addEdge(sourceId, targetId, 'CONTAINS', { order: 1 });
+const edge = await graph.addEdge(sourceId, targetId, 'CONTAINS', { order: 1 });
 
-edge.id;         // 'uuid-xxxx-xxxx'
-edge.sourceId;   // 'source-node-id'
-edge.targetId;   // 'target-node-id'
-edge.type;       // 'CONTAINS'
+edge.id;          // 'uuid-xxxx-xxxx'
+edge.sourceId;    // 'source-node-id'
+edge.targetId;    // 'target-node-id'
+edge.type;        // 'CONTAINS'
 edge.properties;  // { order: 1 }
-edge.toJSON();   // { id: '...', sourceId: '...', targetId: '...', type: 'CONTAINS', properties: { order: 1 } }
+edge.toJSON();    // { id: '...', sourceId: '...', targetId: '...', type: 'CONTAINS', properties: { order: 1 } }
 ```
 
 ## Error Handling
 
 ```typescript
-import { Graph, NodeAlreadyExistsError, NodeNotFoundError, EdgeAlreadyExistsError, NodeHasEdgesError } from 'simple-graphdb';
+import { Graph, NodeAlreadyExistsError, NodeNotFoundError, NodeHasEdgesError } from 'simple-graphdb';
 
 const graph = new Graph();
-const node = graph.addNode('Course', { name: 'Python' });
+const alice = await graph.addNode('Person', { name: 'Alice' });
+const bob   = await graph.addNode('Person', { name: 'Bob' });
+await graph.addEdge(alice.id, bob.id, 'KNOWS');
 
+// NodeHasEdgesError — node has incident edges
 try {
-  // Node IDs are auto-generated, so duplicates come from JSON
-  const data = { nodes: [{ id: 'same-id', type: 'A', properties: {} }, { id: 'same-id', type: 'B', properties: {} }], edges: [] };
-  Graph.fromJSON(data); // Throws NodeAlreadyExistsError
+  await graph.removeNode(alice.id); // throws
+} catch (e) {
+  if (e instanceof NodeHasEdgesError) {
+    console.log(e.message); // "Cannot remove node '...': it still has 1 incident edge(s)..."
+  }
+}
+
+// Cascade delete — removes node AND all incident edges
+await graph.removeNode(alice.id, true);
+
+// importJSON validation
+try {
+  const data = {
+    nodes: [
+      { id: 'same-id', type: 'A', properties: {} },
+      { id: 'same-id', type: 'B', properties: {} },  // duplicate
+    ],
+    edges: [],
+  };
+  await Graph.importJSON(data); // throws NodeAlreadyExistsError
 } catch (e) {
   if (e instanceof NodeAlreadyExistsError) {
     console.log(e.message); // "Node with id 'same-id' already exists"
   }
 }
-
-try {
-  // Missing node reference
-  const data = { nodes: [{ id: 'node1', type: 'Test', properties: {} }], edges: [{ id: 'e1', sourceId: 'non-existent', targetId: 'node1', type: 'LINKS', properties: {} }] };
-  Graph.fromJSON(data); // Throws NodeNotFoundError
-} catch (e) {
-  if (e instanceof NodeNotFoundError) {
-    console.log(e.message); // "Node with id 'non-existent' not found"
-  }
-}
 ```
 
-```typescript
-const alice = graph.addNode('Person', { name: 'Alice' });
-const bob = graph.addNode('Person', { name: 'Bob' });
-graph.addEdge(alice.id, bob.id, 'KNOWS');
-
-try {
-  graph.removeNode(alice.id); // Throws NodeHasEdgesError — node still has incident edges
-} catch (e) {
-  if (e instanceof NodeHasEdgesError) {
-    console.log(e.message); // "Cannot remove node '...': it still has 1 incident edge(s). Use cascade=true to also remove them."
-  }
-}
-
-// To remove with all incident edges:
-graph.removeNode(alice.id, true); // cascade removes KNOWS edge too
-```
-
-Available errors:
+Available error classes:
 - `NodeAlreadyExistsError`
 - `EdgeAlreadyExistsError`
 - `NodeNotFoundError`
 - `EdgeNotFoundError`
 - `NodeHasEdgesError` — thrown by `removeNode(id)` when the node has incident edges and `cascade` is not `true`
+- `InvalidGraphDataError`
 
 ## Serialization & Persistence
 
 ```typescript
 import { Graph } from 'simple-graphdb';
-import fs from 'fs';
+import fs from 'fs/promises';
 
 const graph = new Graph();
 // ... build your graph ...
 
-// Export to JSON
-const data = graph.exportJSON();
-fs.writeFileSync('graph.json', JSON.stringify(data, null, 2));
+// Export to JSON (async)
+const data = await graph.exportJSON();
+await fs.writeFile('graph.json', JSON.stringify(data, null, 2));
 
-// Import from JSON
-const raw = JSON.parse(fs.readFileSync('graph.json', 'utf-8'));
-const restored = Graph.importJSON(raw);
+// Import from JSON (async static method)
+const raw = JSON.parse(await fs.readFile('graph.json', 'utf-8'));
+const restored = await Graph.importJSON(raw);
 ```
-
-> **Migration from v3:** `toJSON()` and `fromJSON()` are still available but deprecated. Rename calls to `exportJSON()` and `importJSON()` respectively.
 
 ## Cascade Delete
 
-By default, removing a node does not remove incident edges. Use `cascade: true` to remove them:
+By default, removing a node with incident edges throws `NodeHasEdgesError`. Pass `cascade: true` to also remove all incident edges:
 
 ```typescript
-const a = graph.addNode('Person', { name: 'A' });
-const b = graph.addNode('Person', { name: 'B' });
-const edgeId = graph.addEdge(a.id, b.id, 'KNOWS').id;
+const a = await graph.addNode('Person', { name: 'A' });
+const b = await graph.addNode('Person', { name: 'B' });
+const edge = await graph.addEdge(a.id, b.id, 'KNOWS');
 
-// Without cascade - edge remains
-graph.removeNode(a.id);
-graph.hasEdge(edgeId); // true
+// Without cascade — throws NodeHasEdgesError
+try {
+  await graph.removeNode(a.id);
+} catch (e) { /* NodeHasEdgesError */ }
 
-// With cascade - edge is also removed
-graph.removeNode(b.id, true);
-graph.hasEdge(edgeId); // false
+// With cascade — removes node AND edge
+await graph.removeNode(a.id, true);
+await graph.hasEdge(edge.id); // false
+```
+
+## Pluggable Storage Architecture
+
+All storage backends implement the `IStorageProvider` interface:
+
+```typescript
+import type { IStorageProvider } from 'simple-graphdb';
+
+class MyCustomProvider implements IStorageProvider {
+  async insertNode(node: NodeData): Promise<void> { /* ... */ }
+  async deleteNode(id: string): Promise<void> { /* ... */ }
+  async hasNode(id: string): Promise<boolean> { /* ... */ }
+  async getNode(id: string): Promise<NodeData | undefined> { /* ... */ }
+  async getAllNodes(): Promise<NodeData[]> { /* ... */ }
+  async getNodesByType(type: string): Promise<NodeData[]> { /* ... */ }
+  async getNodesByProperty(key: string, value: unknown, nodeType?: string): Promise<NodeData[]> { /* ... */ }
+  async insertEdge(edge: EdgeData): Promise<void> { /* ... */ }
+  async deleteEdge(id: string): Promise<void> { /* ... */ }
+  async hasEdge(id: string): Promise<boolean> { /* ... */ }
+  async getEdge(id: string): Promise<EdgeData | undefined> { /* ... */ }
+  async getAllEdges(): Promise<EdgeData[]> { /* ... */ }
+  async getEdgesByType(type: string): Promise<EdgeData[]> { /* ... */ }
+  async getEdgesBySource(nodeId: string): Promise<EdgeData[]> { /* ... */ }
+  async getEdgesByTarget(nodeId: string): Promise<EdgeData[]> { /* ... */ }
+  async exportJSON(): Promise<GraphData> { /* ... */ }
+  async importJSON(data: GraphData): Promise<void> { /* ... */ }
+  async clear(): Promise<void> { /* ... */ }
+}
+
+const graph = new Graph(new MyCustomProvider());
 ```
 
 ## Development
@@ -318,25 +431,35 @@ npm install
 # Build TypeScript
 npm run build
 
-# Run tests
+# Run tests (313 tests)
 npm test
 ```
 
 ## Testing
 
-The test suite includes:
-- `tests/graph/` - Graph core functionality tests (139 tests, organized by feature)
-  - `Graph.node.test.ts` - Node Operations (15 tests)
-  - `Graph.edge.test.ts` - Edge Operations (15 tests)
-  - `Graph.traverse.test.ts` - BFS/DFS traversal (20 tests)
-  - `Graph.serialization.test.ts` - Serialization round-trip (5 tests)
-  - `Graph.isDAG.test.ts` - Cycle detection (10 tests)
-  - `Graph.topologicalSort.test.ts` - Topological ordering (10 tests)
-  - `Graph.fromJSON.test.ts` - JSON validation (6 tests)
-  - `Graph.clear.test.ts` - Graph clearing (1 test)
-- `tests/SocialGraph.test.ts` - Facebook-style social graph with People, Posts, Photos, Comments (75 tests)
-- `tests/EducationGraph.test.ts` - Education domain graph tests (37 tests)
-- `tests/data/education-graph.json` - Education domain graph with Courses, Chapters, Sections, Exams, Tests, Authors, Publishers, and Tags
+The test suite (313 tests across 16 suites) runs against both `InMemoryStorageProvider` and `MongoStorageProvider` backends:
+
+### In-Memory Tests
+- `tests/graph/Graph.node.test.ts` — Node operations
+- `tests/graph/Graph.edge.test.ts` — Edge operations
+- `tests/graph/Graph.traverse.test.ts` — BFS/DFS traversal
+- `tests/graph/Graph.serialization.test.ts` — Serialization round-trip
+- `tests/graph/Graph.isDAG.test.ts` — Cycle detection
+- `tests/graph/Graph.topologicalSort.test.ts` — Topological ordering
+- `tests/graph/Graph.fromJSON.test.ts` — JSON validation
+- `tests/graph/Graph.clear.test.ts` — Graph clearing
+- `tests/graph/GraphToMermaid.test.ts` — Mermaid export
+
+### Cross-Provider Scenarios (InMemory + MongoDB)
+- `tests/EducationGraph.inmemory.test.ts` — Education graph via InMemory provider
+- `tests/EducationGraph.mongo.test.ts` — Education graph via MongoDB provider
+- `tests/SocialGraph.inmemory.test.ts` — Social graph via InMemory provider
+- `tests/SocialGraph.mongo.test.ts` — Social graph via MongoDB provider
+
+### Storage Provider Tests
+- `tests/storage/MongoStorageProvider.test.ts` — MongoDB provider unit tests (isolation, indexing)
+- `tests/storage/MongoGraphFactory.test.ts` — MongoDB factory lifecycle tests
+- `tests/storage/InMemoryGraphFactory.test.ts` — In-memory factory tests
 
 ## License
 
