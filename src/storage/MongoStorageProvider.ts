@@ -283,7 +283,7 @@ export class MongoStorageProvider implements IStorageProvider {
   }
 
   /**
-   * Imports graph data using MongoDB `bulkWrite` for efficiency.
+   * Imports graph data using MongoDB `insertMany` for efficiency.
    *
    * Validates referential integrity before writing:
    *  - Duplicate node ids → NodeAlreadyExistsError
