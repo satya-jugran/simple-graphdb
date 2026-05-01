@@ -157,16 +157,17 @@ export class MongoStorageProvider implements IStorageProvider {
   // ---------------------------------------------------------------------------
 
   async insertNode(node: NodeData): Promise<void> {
-    const exists = await this._nodes.findOne({ graphId: this._graphId, id: node.id });
-    if (exists) {
-      throw new NodeAlreadyExistsError(node.id);
+    try {
+      await this._nodes.insertOne({
+        id: node.id,
+        graphId: this._graphId,
+        type: node.type,
+        properties: node.properties,
+      } as NodeDoc);
+    } catch (e: unknown) {
+      if (this._isDuplicateKeyError(e)) throw new NodeAlreadyExistsError(node.id);
+      throw e;
     }
-    await this._nodes.insertOne({
-      id: node.id,
-      graphId: this._graphId,
-      type: node.type,
-      properties: node.properties,
-    } as NodeDoc);
   }
 
   async deleteNode(id: string): Promise<void> {
@@ -214,18 +215,19 @@ export class MongoStorageProvider implements IStorageProvider {
   // ---------------------------------------------------------------------------
 
   async insertEdge(edge: EdgeData): Promise<void> {
-    const exists = await this._edges.findOne({ graphId: this._graphId, id: edge.id });
-    if (exists) {
-      throw new EdgeAlreadyExistsError(edge.id);
+    try {
+      await this._edges.insertOne({
+        id: edge.id,
+        graphId: this._graphId,
+        sourceId: edge.sourceId,
+        targetId: edge.targetId,
+        type: edge.type,
+        properties: edge.properties,
+      } as EdgeDoc);
+    } catch (e: unknown) {
+      if (this._isDuplicateKeyError(e)) throw new EdgeAlreadyExistsError(edge.id);
+      throw e;
     }
-    await this._edges.insertOne({
-      id: edge.id,
-      graphId: this._graphId,
-      sourceId: edge.sourceId,
-      targetId: edge.targetId,
-      type: edge.type,
-      properties: edge.properties,
-    } as EdgeDoc);
   }
 
   async deleteEdge(id: string): Promise<void> {
@@ -389,5 +391,9 @@ export class MongoStorageProvider implements IStorageProvider {
       type: doc.type,
       properties: doc.properties,
     };
+  }
+
+  private _isDuplicateKeyError(e: unknown): boolean {
+    return e instanceof Error && 'code' in e && (e as { code: number }).code === 11000;
   }
 }

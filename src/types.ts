@@ -25,8 +25,10 @@ export interface EdgeData {
  */
 export interface GraphData {
   /**
-   * Graph partition key. Populated by exportJSON when the source provider has a
-   * non-default graphId. Used as context by importJSON.
+   * Graph partition key. Populated by exportJSON to preserve partition context.
+   * When passed to importJSON, callers are responsible for ensuring the target
+   * provider uses a matching graphId — importJSON does not automatically
+   * re-partition data based on this field.
    */
   graphId?: string;
   nodes: NodeData[];
