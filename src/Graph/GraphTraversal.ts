@@ -112,7 +112,9 @@ export class GraphTraversal {
     // Both wildcards: hardcode maxResults to 10 to discourage blind wildcard search
     const bothWildcards = (sourceId === '*' || (Array.isArray(sourceId) && sourceId.includes('*'))) &&
                           (targetId === '*' || (Array.isArray(targetId) && targetId.includes('*')));
-    const maxResults = bothWildcards ? 10 : (options.maxResults ?? 100);
+    const maxResults = bothWildcards
+       ? Math.min(options.maxResults ?? 10, 10)
+       : (options.maxResults ?? 100);
 
     for (const src of sources) {
       for (const tgt of targets) {

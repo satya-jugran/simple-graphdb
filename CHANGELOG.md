@@ -20,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    - Added optional `type` parameter to `getEdgesBySource()` / `getEdgesByTarget()` for compound index usage.
    - Parallel duplicate checks + batched inserts in `importJSON()`.
    - Type-aware wildcard expansion in `_normalizeToNodeIds()` using `nodeTypes` filter.
-   - `getAllNodes(limit?)` now enforces a 100-node limit to prevent unbounded wildcard traversals.
+   - Wildcard traversal normalization now enforces a 100-node expansion limit to prevent unbounded traversals.
    - `traverse()` hardcodes `maxResults=10` when both `sourceId` and `targetId` are wildcards.
    - `TraversalLimitExceededError` thrown when wildcard expansion exceeds limit.
 

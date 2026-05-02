@@ -123,6 +123,9 @@ export class MongoStorageProvider implements IStorageProvider {
     this._nodes = db.collection<NodeDoc>(nodesColl);
     this._edges = db.collection<EdgeDoc>(edgesColl);
     this._graphId = opts.graphId ?? 'default';
+    if (opts.batchSize !== undefined && opts.batchSize <= 0) {
+      throw new Error(`batchSize must be a positive integer, got: ${opts.batchSize}`);
+    }
     this._batchSize = opts.batchSize ?? 1000;
   }
 
