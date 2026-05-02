@@ -167,7 +167,7 @@ export class InMemoryStorageProvider implements IStorageProvider {
 
   async getAllNodes(limit?: number): Promise<NodeData[]> {
     const nodes = Array.from(this._nodes.values());
-    if (limit) return nodes.slice(0, limit).map(deepClone);
+    if (limit !== undefined) return nodes.slice(0, limit).map(deepClone);
     return nodes.map(deepClone);
   }
 

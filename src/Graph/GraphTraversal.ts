@@ -13,7 +13,7 @@ import { TraversalLimitExceededError } from '../errors';
  * and asynchronous network-based providers through a unified API.
  */
 export class GraphTraversal {
-  constructor(private _store: IStorageProvider) {}
+  constructor(private _store: IStorageProvider) { }
 
   /**
    * Gets traversable children for a given node during type-filtered traversal.
@@ -110,11 +110,11 @@ export class GraphTraversal {
 
     const allPaths: string[][] = [];
     // Both wildcards: hardcode maxResults to 10 to discourage blind wildcard search
+    // while still honoring a smaller caller-provided maxResults.
     const bothWildcards = (sourceId === '*' || (Array.isArray(sourceId) && sourceId.includes('*'))) &&
-                          (targetId === '*' || (Array.isArray(targetId) && targetId.includes('*')));
-    const maxResults = bothWildcards
-       ? Math.min(options.maxResults ?? 10, 10)
-       : (options.maxResults ?? 100);
+      (targetId === '*' || (Array.isArray(targetId) && targetId.includes('*')));
+    const requestedMaxResults = options.maxResults ?? 100;
+    const maxResults = bothWildcards ? Math.min(requestedMaxResults, 10) : requestedMaxResults;
 
     for (const src of sources) {
       for (const tgt of targets) {
