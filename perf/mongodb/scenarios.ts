@@ -23,7 +23,7 @@ export function buildScenarios(nodeCount: number): BenchmarkScenario[] {
     {
       category: 'Write',
       name: 'addNode (single)',
-      setup: () => new Graph(),
+      setup: () => {},  // keep meta.graph (MongoDB-backed)
       run: async (graph, _meta) => {
         await graph.addNode('Product', { label: `product-${Date.now()}`, score: 99 });
       },
@@ -36,15 +36,13 @@ export function buildScenarios(nodeCount: number): BenchmarkScenario[] {
       category: 'Write',
       name: 'addEdge (single)',
       setup: async (meta) => {
-        const g = new Graph();
         const pool = 100; // Smaller pool for MongoDB
         const nodeIds: string[] = [];
         for (let i = 0; i < pool; i++) {
-          const n = await g.addNode('Person', { index: i });
+          const n = await meta.graph.addNode('Person', { index: i });
           nodeIds.push(n.id);
         }
         (meta as GraphMeta & { _edgePool?: string[] })._edgePool = nodeIds;
-        return g;
       },
       run: async (graph, meta) => {
         const pool = (meta as GraphMeta & { _edgePool?: string[] })._edgePool!;
@@ -62,7 +60,7 @@ export function buildScenarios(nodeCount: number): BenchmarkScenario[] {
     {
       category: 'Write',
       name: 'addNode (batch 50)',
-      setup: () => new Graph(),
+      setup: () => {},  // keep meta.graph (MongoDB-backed)
       run: async (graph, _meta) => {
         const promises = [];
         for (let i = 0; i < 50; i++) {
@@ -282,28 +280,25 @@ export function buildScenarios(nodeCount: number): BenchmarkScenario[] {
       category: 'Mutation',
       name: 'removeEdge',
       setup: async (meta) => {
-        const g = new Graph();
         const ids: string[] = [];
         const n = 500; // Smaller for MongoDB
         for (let i = 0; i < n; i++) {
-          const node = await g.addNode('Person', { i });
+          const node = await meta.graph.addNode('Person', { i });
           ids.push(node.id);
         }
         const edgeIds: string[] = [];
         for (let i = 0; i < n - 1; i++) {
-          const edge = await g.addEdge(ids[i], ids[i + 1], 'KNOWS');
+          const edge = await meta.graph.addEdge(ids[i], ids[i + 1], 'KNOWS');
           edgeIds.push(edge.id);
         }
-        (meta as GraphMeta & { _removeEdgeGraph?: Graph; _removeEdgeIds?: string[] })._removeEdgeGraph = g;
         (meta as GraphMeta & { _removeEdgeIds?: string[] })._removeEdgeIds = edgeIds;
-        return g;
       },
-      run: async (_graph, meta) => {
-        const m = meta as GraphMeta & { _removeEdgeGraph?: Graph; _removeEdgeIds?: string[] };
+      run: async (graph, meta) => {
+        const m = meta as GraphMeta & { _removeEdgeIds?: string[] };
         const ids = m._removeEdgeIds!;
         if (ids.length > 0) {
           const id = ids.pop()!;
-          await m._removeEdgeGraph!.removeEdge(id);
+          await graph.removeEdge(id);
         }
       },
       iterations: 200,
@@ -314,28 +309,25 @@ export function buildScenarios(nodeCount: number): BenchmarkScenario[] {
       category: 'Mutation',
       name: 'removeNode (cascade)',
       setup: async (meta) => {
-        const g = new Graph();
         const ids: string[] = [];
         const n = 500;
         for (let i = 0; i < n; i++) {
-          const node = await g.addNode('Person', { i });
+          const node = await meta.graph.addNode('Person', { i });
           ids.push(node.id);
         }
         for (let i = 0; i < n - 1; i++) {
-          await g.addEdge(ids[i], ids[i + 1], 'KNOWS');
+          await meta.graph.addEdge(ids[i], ids[i + 1], 'KNOWS');
         }
-        (meta as GraphMeta & { _removeCascadeGraph?: Graph; _removeCascadeIds?: string[] })._removeCascadeGraph = g;
         (meta as GraphMeta & { _removeCascadeIds?: string[] })._removeCascadeIds = [...ids];
-        return g;
       },
-      run: async (_graph, meta) => {
-        const m = meta as GraphMeta & { _removeCascadeGraph?: Graph; _removeCascadeIds?: string[] };
+      run: async (graph, meta) => {
+        const m = meta as GraphMeta & { _removeCascadeIds?: string[] };
         const ids = m._removeCascadeIds!;
         if (ids.length > 0) {
           const id = ids.pop()!;
-          const exists = await m._removeCascadeGraph!.hasNode(id);
+          const exists = await graph.hasNode(id);
           if (exists) {
-            await m._removeCascadeGraph!.removeNode(id, true);
+            await graph.removeNode(id, true);
           }
         }
       },
@@ -350,18 +342,8 @@ export function buildScenarios(nodeCount: number): BenchmarkScenario[] {
         const size = Math.min(200, Math.floor(meta.nodeCount / 10));
         (meta as GraphMeta & { _clearSize?: number })._clearSize = size;
       },
-      run: async (_graph, meta) => {
-        const size = (meta as GraphMeta & { _clearSize?: number })._clearSize!;
-        const g = new Graph();
-        const ids: string[] = [];
-        for (let i = 0; i < size; i++) {
-          const n = await g.addNode('Person', { i });
-          ids.push(n.id);
-        }
-        for (let i = 0; i < size - 1; i++) {
-          await g.addEdge(ids[i], ids[i + 1], 'KNOWS');
-        }
-        await g.clear();
+      run: async (graph, _meta) => {
+        await graph.clear();
       },
       iterations: isLarge ? 5 : 10,
     },
