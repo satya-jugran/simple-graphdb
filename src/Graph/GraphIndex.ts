@@ -208,9 +208,8 @@ export class GraphIndex {
     const edgeType = options?.edgeType ?? '*';
     const childIds = new Set<string>();
 
-    const edges = await this._store.getEdgesBySource(nodeId);
+    const edges = await this._store.getEdgesBySource(nodeId, edgeType !== '*' ? edgeType : undefined);
     for (const edge of edges) {
-      if (edgeType !== '*' && edge.type !== edgeType) continue;
       if (nodeType === '*') {
         childIds.add(edge.targetId);
       } else {
@@ -234,10 +233,8 @@ export class GraphIndex {
     if (!await this._store.hasNode(sourceId)) throw new NodeNotFoundError(sourceId);
 
     const edgeType = options?.edgeType ?? '*';
-    const data = await this._store.getEdgesBySource(sourceId);
-    return data
-      .filter(e => edgeType === '*' || e.type === edgeType)
-      .map(d => new Edge(d.sourceId, d.targetId, d.type, d.properties, d.id));
+    const data = await this._store.getEdgesBySource(sourceId, edgeType !== '*' ? edgeType : undefined);
+    return data.map(d => new Edge(d.sourceId, d.targetId, d.type, d.properties, d.id));
   }
 
   /**
@@ -248,10 +245,8 @@ export class GraphIndex {
     if (!await this._store.hasNode(targetId)) throw new NodeNotFoundError(targetId);
 
     const edgeType = options?.edgeType ?? '*';
-    const data = await this._store.getEdgesByTarget(targetId);
-    return data
-      .filter(e => edgeType === '*' || e.type === edgeType)
-      .map(d => new Edge(d.sourceId, d.targetId, d.type, d.properties, d.id));
+    const data = await this._store.getEdgesByTarget(targetId, edgeType !== '*' ? edgeType : undefined);
+    return data.map(d => new Edge(d.sourceId, d.targetId, d.type, d.properties, d.id));
   }
 
   /**
@@ -270,17 +265,17 @@ export class GraphIndex {
     const result: Edge[] = [];
 
     const [outFromSource, outFromTarget] = await Promise.all([
-      this._store.getEdgesBySource(sourceId),
-      this._store.getEdgesBySource(targetId),
+      this._store.getEdgesBySource(sourceId, edgeType !== '*' ? edgeType : undefined),
+      this._store.getEdgesBySource(targetId, edgeType !== '*' ? edgeType : undefined),
     ]);
 
     for (const e of outFromSource) {
-      if (e.targetId === targetId && (edgeType === '*' || e.type === edgeType)) {
+      if (e.targetId === targetId) {
         result.push(new Edge(e.sourceId, e.targetId, e.type, e.properties, e.id));
       }
     }
     for (const e of outFromTarget) {
-      if (e.targetId === sourceId && (edgeType === '*' || e.type === edgeType)) {
+      if (e.targetId === sourceId) {
         result.push(new Edge(e.sourceId, e.targetId, e.type, e.properties, e.id));
       }
     }

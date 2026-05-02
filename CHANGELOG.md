@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.1.0] - 2026-05-02
+
+### ✨ New Features
+
+1. **MongoDB Performance Test Suite** — `perf/mongodb/`
+   - Added `entryPoint.ts` for MongoDB-backed graph benchmarks.
+   - Added `scenarios.ts` with Write, Read, Navigation, and Traversal benchmarks.
+   - Uses `MongoGraphFactory.fromGraphData()` for efficient data import.
+
+2. **MongoDB Performance Improvements**
+   - Batched cursor streaming in `getAllNodes()` / `getAllEdges()` with configurable `batchSize`.
+   - Replaced `countDocuments()` with `findOne()` in `hasNode()` / `hasEdge()`.
+   - Added optional `type` parameter to `getEdgesBySource()` / `getEdgesByTarget()` for compound index usage.
+   - Parallel duplicate checks + batched inserts in `importJSON()`.
+   - Type-aware wildcard expansion in `_normalizeToNodeIds()` using `nodeTypes` filter.
+   - Wildcard traversal normalization now enforces a 100-node expansion limit to prevent unbounded traversals.
+   - `traverse()` hardcodes `maxResults=10` when both `sourceId` and `targetId` are wildcards.
+   - `TraversalLimitExceededError` thrown when wildcard expansion exceeds limit.
+
+3. **`MongoGraphFactory.fromGraphData()`**
+   - Convenience method combining `forGraph()` + `importJSON()`.
+   - Filters incoming data by `graphId` partition for multi-graph data scenarios.
+
+### 🐛 Bug Fixes
+
+- `buildGraph()` now uses `InMemoryStorageProvider` with correct `graphId` instead of default provider.
+
 ## [5.0.0] - 2026-05-01
 
 ### 🚨 Breaking Changes

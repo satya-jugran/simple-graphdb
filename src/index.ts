@@ -31,4 +31,5 @@ export {
   NodeHasEdgesError,
   EdgeNotFoundError,
   InvalidGraphDataError,
+  TraversalLimitExceededError,
 } from './errors';

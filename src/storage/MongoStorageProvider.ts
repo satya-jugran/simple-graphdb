@@ -61,6 +61,13 @@ export interface MongoStorageProviderOptions {
    * @default 'sgdb_edges'
    */
   edgesCollection?: string;
+
+  /**
+   * Batch size for cursor-based iteration in getAllNodes() / getAllEdges().
+   * Controls how many documents are fetched per MongoDB round-trip.
+   * @default 1000
+   */
+  batchSize?: number;
 }
 
 /**
@@ -103,6 +110,7 @@ export class MongoStorageProvider implements IStorageProvider {
   private readonly _nodes: Collection<NodeDoc>;
   private readonly _edges: Collection<EdgeDoc>;
   private readonly _graphId: string;
+  private readonly _batchSize: number;
 
   /**
    * @param db   - An already-connected Mongo `Db` instance.
@@ -115,6 +123,10 @@ export class MongoStorageProvider implements IStorageProvider {
     this._nodes = db.collection<NodeDoc>(nodesColl);
     this._edges = db.collection<EdgeDoc>(edgesColl);
     this._graphId = opts.graphId ?? 'default';
+    if (opts.batchSize !== undefined && opts.batchSize <= 0) {
+      throw new Error(`batchSize must be a positive integer, got: ${opts.batchSize}`);
+    }
+    this._batchSize = opts.batchSize ?? 1000;
   }
 
   // ---------------------------------------------------------------------------
@@ -178,8 +190,11 @@ export class MongoStorageProvider implements IStorageProvider {
   // ---------------------------------------------------------------------------
 
   async hasNode(id: string): Promise<boolean> {
-    const count = await this._nodes.countDocuments({ graphId: this._graphId, id }, { limit: 1 });
-    return count > 0;
+    const doc = await this._nodes.findOne(
+      { graphId: this._graphId, id },
+      { projection: { _id: 1 } },
+    );
+    return doc !== null;
   }
 
   async getNode(id: string): Promise<NodeData | undefined> {
@@ -187,9 +202,15 @@ export class MongoStorageProvider implements IStorageProvider {
     return doc ? this._docToNode(doc) : undefined;
   }
 
-  async getAllNodes(): Promise<NodeData[]> {
-    const docs = await this._nodes.find({ graphId: this._graphId }).toArray();
-    return docs.map(d => this._docToNode(d));
+  async getAllNodes(limit?: number): Promise<NodeData[]> {
+    const nodes: NodeData[] = [];
+    const cursor = this._nodes.find({ graphId: this._graphId }).batchSize(this._batchSize);
+    if (limit) cursor.limit(limit);
+
+    for await (const doc of cursor) {
+      nodes.push(this._docToNode(doc));
+    }
+    return nodes;
   }
 
   async getNodesByType(type: string): Promise<NodeData[]> {
@@ -238,8 +259,11 @@ export class MongoStorageProvider implements IStorageProvider {
   // ---------------------------------------------------------------------------
 
   async hasEdge(id: string): Promise<boolean> {
-    const count = await this._edges.countDocuments({ graphId: this._graphId, id }, { limit: 1 });
-    return count > 0;
+    const doc = await this._edges.findOne(
+      { graphId: this._graphId, id },
+      { projection: { _id: 1 } },
+    );
+    return doc !== null;
   }
 
   async getEdge(id: string): Promise<EdgeData | undefined> {
@@ -248,8 +272,13 @@ export class MongoStorageProvider implements IStorageProvider {
   }
 
   async getAllEdges(): Promise<EdgeData[]> {
-    const docs = await this._edges.find({ graphId: this._graphId }).toArray();
-    return docs.map(d => this._docToEdge(d));
+    const edges: EdgeData[] = [];
+    const cursor = this._edges.find({ graphId: this._graphId }).batchSize(this._batchSize);
+
+    for await (const doc of cursor) {
+      edges.push(this._docToEdge(doc));
+    }
+    return edges;
   }
 
   async getEdgesByType(type: string): Promise<EdgeData[]> {
@@ -257,13 +286,17 @@ export class MongoStorageProvider implements IStorageProvider {
     return docs.map(d => this._docToEdge(d));
   }
 
-  async getEdgesBySource(nodeId: string): Promise<EdgeData[]> {
-    const docs = await this._edges.find({ graphId: this._graphId, sourceId: nodeId }).toArray();
+  async getEdgesBySource(nodeId: string, type?: string): Promise<EdgeData[]> {
+    const filter: Filter<EdgeDoc> = { graphId: this._graphId, sourceId: nodeId };
+    if (type) filter.type = type;
+    const docs = await this._edges.find(filter).toArray();
     return docs.map(d => this._docToEdge(d));
   }
 
-  async getEdgesByTarget(nodeId: string): Promise<EdgeData[]> {
-    const docs = await this._edges.find({ graphId: this._graphId, targetId: nodeId }).toArray();
+  async getEdgesByTarget(nodeId: string, type?: string): Promise<EdgeData[]> {
+    const filter: Filter<EdgeDoc> = { graphId: this._graphId, targetId: nodeId };
+    if (type) filter.type = type;
+    const docs = await this._edges.find(filter).toArray();
     return docs.map(d => this._docToEdge(d));
   }
 
@@ -272,14 +305,23 @@ export class MongoStorageProvider implements IStorageProvider {
   // ---------------------------------------------------------------------------
 
   async exportJSON(): Promise<GraphData> {
-    const [nodeDocs, edgeDocs] = await Promise.all([
-      this._nodes.find({ graphId: this._graphId }).toArray(),
-      this._edges.find({ graphId: this._graphId }).toArray(),
-    ]);
+    const nodes: NodeData[] = [];
+    const edges: EdgeData[] = [];
+
+    const nodesCursor = this._nodes.find({ graphId: this._graphId }).batchSize(this._batchSize);
+    for await (const doc of nodesCursor) {
+      nodes.push(this._docToNode(doc));
+    }
+
+    const edgesCursor = this._edges.find({ graphId: this._graphId }).batchSize(this._batchSize);
+    for await (const doc of edgesCursor) {
+      edges.push(this._docToEdge(doc));
+    }
+
     return {
       graphId: this._graphId,
-      nodes: nodeDocs.map(d => this._docToNode(d)),
-      edges: edgeDocs.map(d => this._docToEdge(d)),
+      nodes,
+      edges,
     };
   }
 
@@ -304,25 +346,20 @@ export class MongoStorageProvider implements IStorageProvider {
       edgeIdSet.add(e.id);
     }
 
-    // ---- Check for existing ids in the database under this graphId ----
-    if (data.nodes.length > 0) {
-      const existingNode = await this._nodes.findOne({
-        graphId: this._graphId,
-        id: { $in: data.nodes.map(n => n.id) },
-      });
-      if (existingNode) {
-        throw new NodeAlreadyExistsError(existingNode.id);
-      }
-    }
-    if (data.edges.length > 0) {
-      const existingEdge = await this._edges.findOne({
-        graphId: this._graphId,
-        id: { $in: data.edges.map(e => e.id) },
-      });
-      if (existingEdge) {
-        throw new EdgeAlreadyExistsError(existingEdge.id);
-      }
-    }
+    // ---- Check for existing ids in the database under this graphId (parallel) ----
+    const nodeIds = data.nodes.map(n => n.id);
+    const edgeIds = data.edges.map(e => e.id);
+
+    const [conflictNode, conflictEdge] = await Promise.all([
+      data.nodes.length > 0
+        ? this._nodes.findOne({ graphId: this._graphId, id: { $in: nodeIds } })
+        : Promise.resolve(null),
+      data.edges.length > 0
+        ? this._edges.findOne({ graphId: this._graphId, id: { $in: edgeIds } })
+        : Promise.resolve(null),
+    ]);
+    if (conflictNode) throw new NodeAlreadyExistsError(conflictNode.id);
+    if (conflictEdge) throw new EdgeAlreadyExistsError(conflictEdge.id);
 
     // ---- Validate edge source/target references ----
     // Only load the node ids actually referenced by incoming edges (avoids loading all nodes)
@@ -345,28 +382,30 @@ export class MongoStorageProvider implements IStorageProvider {
       if (!existingIdSet.has(e.targetId)) throw new NodeNotFoundError(e.targetId);
     }
 
-    // ---- Bulk insert ----
+    // ---- Bulk insert (batched) ----
     if (data.nodes.length > 0) {
-      await this._nodes.insertMany(
-        data.nodes.map(n => ({
-          id: n.id,
-          graphId: this._graphId,
-          type: n.type,
-          properties: n.properties,
-        } as NodeDoc)),
-      );
+      const nodeDocs = data.nodes.map(n => ({
+        id: n.id,
+        graphId: this._graphId,
+        type: n.type,
+        properties: n.properties,
+      } as NodeDoc));
+      for (let i = 0; i < nodeDocs.length; i += this._batchSize) {
+        await this._nodes.insertMany(nodeDocs.slice(i, i + this._batchSize));
+      }
     }
     if (data.edges.length > 0) {
-      await this._edges.insertMany(
-        data.edges.map(e => ({
-          id: e.id,
-          graphId: this._graphId,
-          sourceId: e.sourceId,
-          targetId: e.targetId,
-          type: e.type,
-          properties: e.properties,
-        } as EdgeDoc)),
-      );
+      const edgeDocs = data.edges.map(e => ({
+        id: e.id,
+        graphId: this._graphId,
+        sourceId: e.sourceId,
+        targetId: e.targetId,
+        type: e.type,
+        properties: e.properties,
+      } as EdgeDoc));
+      for (let i = 0; i < edgeDocs.length; i += this._batchSize) {
+        await this._edges.insertMany(edgeDocs.slice(i, i + this._batchSize));
+      }
     }
   }
 

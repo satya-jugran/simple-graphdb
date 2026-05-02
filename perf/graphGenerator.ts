@@ -1,4 +1,5 @@
 import { Graph } from '../src/index';
+import { InMemoryStorageProvider } from '../src/storage/InMemoryStorageProvider';
 
 export interface GraphMeta {
   graph: Graph;
@@ -39,7 +40,8 @@ function randInt(rng: () => number, min: number, max: number): number {
 export async function buildGraph(
   nodeCount: number,
   edgesPerNode: number,
-  seed = 42
+  seed = 42,
+  graphId = 'default'
 ): Promise<GraphMeta> {
   const rng = makeRng(seed);
 
@@ -85,7 +87,8 @@ export async function buildGraph(
   }
 
   // ── Load via importJSON (single batch insert) ─────────────────────────────
-  const graph = await Graph.importJSON({ nodes, edges });
+  const provider = new InMemoryStorageProvider({ graphId });
+  const graph = await Graph.importJSON({ graphId, nodes, edges }, provider);
 
   if (typeof global.gc === 'function') global.gc();
   const heapAfter = process.memoryUsage().heapUsed;
@@ -102,7 +105,7 @@ export async function buildGraph(
 
   // ── Build a separate DAG for isDAG / topologicalSort ──────────────────────
   const dagSize = Math.min(5000, Math.floor(nodeCount * 0.05));
-  const dagMeta = await buildDag(dagSize, rng);
+  const dagMeta = await buildDag(dagSize, rng, graphId);
 
   return {
     graph,
@@ -120,6 +123,7 @@ export async function buildGraph(
 async function buildDag(
   nodeCount: number,
   rng: () => number,
+  graphId = 'default'
 ): Promise<{ graph: Graph; nodeIds: string[] }> {
   const dagNodes: Array<{ id: string; type: string; properties: Record<string, unknown> }> = [];
   const dagEdges: Array<{ id: string; sourceId: string; targetId: string; type: string; properties: Record<string, unknown> }> = [];
@@ -143,7 +147,7 @@ async function buildDag(
     }
   }
 
-  const dagGraph = await Graph.importJSON({ nodes: dagNodes, edges: dagEdges });
+  const dagGraph = await Graph.importJSON({ graphId, nodes: dagNodes, edges: dagEdges });
 
   return { graph: dagGraph, nodeIds: dagNodes.map(n => n.id) };
 }
