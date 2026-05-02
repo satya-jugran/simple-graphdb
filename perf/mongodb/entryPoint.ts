@@ -89,7 +89,11 @@ async function main(): Promise<void> {
   for (const scale of SCALES) {
     printScaleHeader(scale.label);
 
-    // ── 5. Build the baseline graph (timed) ──────────────────────────────
+    // ── 5. Clear any existing data for this graphId ────────────────────────
+    const clearGraph = factory.forGraph(config.graphId);
+    await clearGraph.clear();
+
+    // ── 6. Build the baseline graph (timed) ────────────────────────────────
     printSectionTitle(`Building graph: ${scale.nodeCount.toLocaleString()} nodes @ ${scale.edgesPerNode} edges/node`);
     const buildStart = process.hrtime.bigint();
 
@@ -105,7 +109,7 @@ async function main(): Promise<void> {
     console.log(`  ✓  Built: ${mongoMeta.nodeCount.toLocaleString()} nodes, ${mongoMeta.edgeCount.toLocaleString()} edges in ${buildMs.toFixed(0)} ms`);
     console.log(`  ✓  DAG subgraph: ${mongoMeta.dagNodeIds.length.toLocaleString()} nodes`);
 
-    // ── 6. Run all benchmark scenarios ─────────────────────────────────────
+    // ── 7. Run all benchmark scenarios ─────────────────────────────────────
     printSectionTitle('Running benchmark scenarios');
 
     const scenarios = buildScenarios(scale.nodeCount);
@@ -118,16 +122,16 @@ async function main(): Promise<void> {
       console.log(`✓  ${result.meanMs < 1 ? result.meanMs.toFixed(3) + ' ms/op' : result.meanMs.toFixed(2) + ' ms/op'}`);
     }
 
-    // ── 7. Print results table ─────────────────────────────────────────────
+    // ── 8. Print results table ─────────────────────────────────────────────
     console.log();
     printReport(results, mongoMeta.nodeCount, mongoMeta.edgeCount, 0, scale.label);
 
-    // ── 8. Cleanup before next scale ───────────────────────────────────────
+    // ── 9. Cleanup before next scale ───────────────────────────────────────
     await mongoMeta.graph.clear();
     if (typeof global.gc === 'function') global.gc();
   }
 
-  // ── 9. Cleanup and disconnect ────────────────────────────────────────────
+  // ── 10. Cleanup and disconnect ────────────────────────────────────────────
   printSectionTitle('Cleaning up...');
   const cleanupGraph = factory.forGraph(config.graphId);
   await cleanupGraph.clear();
