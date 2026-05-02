@@ -1,5 +1,6 @@
 import type { IStorageProvider } from '../storage/IStorageProvider';
 import type { TraversalOptions } from './TraversalOptions';
+import { TraversalLimitExceededError } from '../errors';
 
 /**
  * Internal class that handles graph traversal operations.
@@ -26,11 +27,13 @@ export class GraphTraversal {
     nodeTypes: string[] = ['*'],
     edgeTypes: string[] = ['*']
   ): Promise<string[]> {
-    const outEdges = await this._store.getEdgesBySource(nodeId);
+    // Pass single edge type to storage if filter is specific (for compound index usage)
+    const edgeType = (edgeTypes.length === 1 && edgeTypes[0] !== '*') ? edgeTypes[0] : undefined;
+    const outEdges = await this._store.getEdgesBySource(nodeId, edgeType);
     const children: string[] = [];
 
     for (const edge of outEdges) {
-      // Apply edge type filter
+      // Apply additional edge type filter if wildcard was used
       const shouldFilterEdge = edgeTypes.length > 0 && !edgeTypes.includes('*');
       if (shouldFilterEdge && !edgeTypes.includes(edge.type)) {
         continue;
@@ -56,19 +59,37 @@ export class GraphTraversal {
    * @param input - Single ID, '*', or array of IDs
    * @returns Array of node IDs
    */
-  private async _normalizeToNodeIds(input: string | string[]): Promise<string[]> {
-    if (Array.isArray(input)) {
-      if (input.length === 0 || input.includes('*')) {
-        const all = await this._store.getAllNodes();
-        return all.map(n => n.id);
-      }
-      return input;
+  private async _normalizeToNodeIds(input: string | string[], nodeTypes?: string[]): Promise<string[]> {
+    const isWildcard = Array.isArray(input)
+      ? input.length === 0 || input.includes('*')
+      : input === '*';
+
+    if (!isWildcard) {
+      return Array.isArray(input) ? input : [input];
     }
-    if (input === '*') {
-      const all = await this._store.getAllNodes();
-      return all.map(n => n.id);
+
+    // Use type-filtered query if nodeTypes are specified and not ['*']
+    if (nodeTypes && nodeTypes.length > 0 && !nodeTypes.includes('*')) {
+      const ids: string[] = [];
+      await Promise.all(
+        nodeTypes.map(type => this._store.getNodesByType(type))
+      ).then(results => {
+        for (const nodes of results) {
+          for (const node of nodes) {
+            ids.push(node.id);
+          }
+        }
+      });
+      return ids;
     }
-    return [input];
+
+    // Fall back to all nodes (limit to prevent unbounded traversal)
+    const LIMIT = 100;
+    const all = await this._store.getAllNodes(LIMIT);
+    if (all.length >= LIMIT) {
+      throw new TraversalLimitExceededError(LIMIT);
+    }
+    return all.map(n => n.id);
   }
 
   /**
@@ -84,11 +105,14 @@ export class GraphTraversal {
     targetId: string | string[],
     options: TraversalOptions = {}
   ): Promise<string[][] | null> {
-    const sources = await this._normalizeToNodeIds(sourceId);
-    const targets = await this._normalizeToNodeIds(targetId);
+    const sources = await this._normalizeToNodeIds(sourceId, options.nodeTypes);
+    const targets = await this._normalizeToNodeIds(targetId, options.nodeTypes);
 
     const allPaths: string[][] = [];
-    const maxResults = options.maxResults ?? 100;
+    // Both wildcards: hardcode maxResults to 10 to discourage blind wildcard search
+    const bothWildcards = (sourceId === '*' || (Array.isArray(sourceId) && sourceId.includes('*'))) &&
+                          (targetId === '*' || (Array.isArray(targetId) && targetId.includes('*')));
+    const maxResults = bothWildcards ? 10 : (options.maxResults ?? 100);
 
     for (const src of sources) {
       for (const tgt of targets) {

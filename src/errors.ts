@@ -54,6 +54,17 @@ export class EdgeNotFoundError extends GraphError {
 }
 
 /**
+ * Error thrown when a wildcard traversal exceeds the maximum allowed nodes
+ */
+export class TraversalLimitExceededError extends GraphError {
+  constructor(limit: number) {
+    super(`Wildcard traversal exceeded limit of ${limit} nodes. Use typed node filters (e.g., nodeTypes: ['User']) instead of wildcard '*' for large graphs.`);
+    this.name = 'TraversalLimitExceededError';
+    Object.setPrototypeOf(this, TraversalLimitExceededError.prototype);
+  }
+}
+
+/**
  * Error thrown when attempting to remove a node that still has incident edges without cascade
  */
 export class NodeHasEdgesError extends GraphError {

@@ -165,8 +165,10 @@ export class InMemoryStorageProvider implements IStorageProvider {
     return node ? deepClone(node) : undefined;
   }
 
-  async getAllNodes(): Promise<NodeData[]> {
-    return Array.from(this._nodes.values()).map(deepClone);
+  async getAllNodes(limit?: number): Promise<NodeData[]> {
+    const nodes = Array.from(this._nodes.values()).map(deepClone);
+    if (limit) return nodes.slice(0, limit);
+    return nodes;
   }
 
   async getNodesByType(type: string): Promise<NodeData[]> {
@@ -278,21 +280,23 @@ export class InMemoryStorageProvider implements IStorageProvider {
       .map(deepClone);
   }
 
-  async getEdgesBySource(nodeId: string): Promise<EdgeData[]> {
+  async getEdgesBySource(nodeId: string, type?: string): Promise<EdgeData[]> {
     const ids = this._edgesBySource.get(nodeId);
     if (!ids) return [];
     return Array.from(ids)
       .map(id => this._edges.get(id))
       .filter((e): e is EdgeData => e !== undefined)
+      .filter(e => !type || e.type === type)
       .map(deepClone);
   }
 
-  async getEdgesByTarget(nodeId: string): Promise<EdgeData[]> {
+  async getEdgesByTarget(nodeId: string, type?: string): Promise<EdgeData[]> {
     const ids = this._edgesByTarget.get(nodeId);
     if (!ids) return [];
     return Array.from(ids)
       .map(id => this._edges.get(id))
       .filter((e): e is EdgeData => e !== undefined)
+      .filter(e => !type || e.type === type)
       .map(deepClone);
   }
 

@@ -57,8 +57,11 @@ export interface IStorageProvider {
   /** Returns the NodeData for the given id, or undefined if not found. */
   getNode(id: string): Promise<NodeData | undefined>;
 
-  /** Returns all stored nodes. */
-  getAllNodes(): Promise<NodeData[]>;
+  /**
+   * Returns all stored nodes, optionally limited.
+   * @param limit - Maximum number of nodes to return (default: unlimited)
+   */
+  getAllNodes(limit?: number): Promise<NodeData[]>;
 
   /**
    * Returns all nodes whose `type` field matches the given value.
@@ -110,15 +113,17 @@ export interface IStorageProvider {
 
   /**
    * Returns all edges whose `sourceId` equals the given node id.
+   * Optionally filtered by edge type to leverage compound adjacency indexes.
    * Implementations must use an adjacency index (not a full scan).
    */
-  getEdgesBySource(nodeId: string): Promise<EdgeData[]>;
+  getEdgesBySource(nodeId: string, type?: string): Promise<EdgeData[]>;
 
   /**
    * Returns all edges whose `targetId` equals the given node id.
+   * Optionally filtered by edge type to leverage compound adjacency indexes.
    * Implementations must use an adjacency index (not a full scan).
    */
-  getEdgesByTarget(nodeId: string): Promise<EdgeData[]>;
+  getEdgesByTarget(nodeId: string, type?: string): Promise<EdgeData[]>;
 
   // ---------------------------------------------------------------------------
   // Data portability

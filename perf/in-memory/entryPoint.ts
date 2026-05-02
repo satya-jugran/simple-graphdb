@@ -1,19 +1,18 @@
 #!/usr/bin/env node
 /**
- * simple-graphdb Performance Test Runner
+ * simple-graphdb  ·  In-Memory Performance Test Runner
  *
  * Run with:
- *   npx ts-node --project tsconfig.perf.json perf/perfTest.ts
- *
- * For accurate memory measurements, add --expose-gc:
- *   node --expose-gc -r ts-node/register --project tsconfig.perf.json perf/perfTest.ts
+ *   npm run perf:in-memory
+ *   npm run perf:in-memory:gc   (with accurate heap measurements)
  */
 
-import { buildGraph } from './graphGenerator';
-import { runScenario, printReport, printScaleHeader, printSectionTitle } from './benchmarkRunner';
+import { buildGraph } from '../graphGenerator';
+import { runScenario, printReport, printScaleHeader, printSectionTitle } from '../benchmarkRunner';
 import { buildScenarios } from './scenarios';
 
 // ─── Scale Definitions ────────────────────────────────────────────────────────
+// In-memory provider is fast — we can benchmark at significant scales.
 
 interface ScaleConfig {
   label: string;
@@ -32,14 +31,13 @@ const SCALES: ScaleConfig[] = [
 async function main(): Promise<void> {
   console.log('\n');
   console.log('╔══════════════════════════════════════════════════════════════════════════════╗');
-  console.log('║            simple-graphdb  ·  Performance Test Suite                         ║');
-  console.log('║            Benchmarks: Write · Read · Navigation · Traversal                 ║');
-  console.log('║                        Analysis · Serialization · Mutation                   ║');
+  console.log('║          simple-graphdb  ·  In-Memory Performance Test Suite                 ║');
+  console.log('║          Benchmarks: Write · Read · Navigation · Traversal · Analysis       ║');
   console.log('╚══════════════════════════════════════════════════════════════════════════════╝');
 
   if (typeof global.gc !== 'function') {
     console.log('\n  ⚠  TIP: Run with --expose-gc for more accurate heap measurements.');
-    console.log('     e.g.: node --expose-gc -r ts-node/register --project tsconfig.perf.json perf/perfTest.ts\n');
+    console.log('     e.g.: npm run perf:in-memory:gc\n');
   } else {
     console.log('\n  ✓  GC available — heap measurements will be accurate.\n');
   }

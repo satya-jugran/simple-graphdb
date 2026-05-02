@@ -1,5 +1,6 @@
 import type { Db } from 'mongodb';
 import { Graph } from '../Graph';
+import type { GraphData } from '../types';
 import {
   MongoStorageProvider,
   type MongoStorageProviderOptions,
@@ -65,5 +66,30 @@ export class MongoGraphFactory implements IGraphFactory {
   forGraph(graphId: string = 'default'): Graph {
     const provider = new MongoStorageProvider(this._db, { ...this._opts, graphId });
     return new Graph(provider);
+  }
+
+  /**
+   * Creates a Graph instance and imports the given graph data into it.
+   * Convenience method that combines forGraph() + importJSON().
+   *
+   * @param data - The GraphData to import
+   * @param graphId - Graph partition ID (defaults to 'default')
+   * @returns A Graph instance with the imported data
+   */
+  async fromGraphData(data: GraphData, graphId: string = 'default'): Promise<Graph> {
+    const provider = new MongoStorageProvider(this._db, { ...this._opts, graphId });
+    const graph = new Graph(provider);
+
+    // Filter data to only import nodes/edges that belong to this graphId
+    // If data.graphId is set and doesn't match, skip (data is from different partition)
+    // If data.graphId is not set, import all (backward compatible for legacy data)
+    const filteredData: GraphData = {
+      graphId,
+      nodes: data.graphId === undefined || data.graphId === graphId ? data.nodes : [],
+      edges: data.graphId === undefined || data.graphId === graphId ? data.edges : [],
+    };
+
+    await Graph.importJSON(filteredData, provider);
+    return graph;
   }
 }
