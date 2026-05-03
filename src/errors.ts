@@ -1,3 +1,5 @@
+import { safeStringify } from './utils';
+
 /**
  * Base class for all graph-related errors
  */
@@ -92,7 +94,7 @@ export class InvalidGraphDataError extends GraphError {
  */
 export class InvalidPropertyError extends GraphError {
   constructor(propertyKey: string, propertyValue: unknown) {
-    super(`Invalid property value for key '${propertyKey}': property values must be primitives only. Received: ${JSON.stringify(propertyValue)}`);
+    super(`Invalid property value for key '${propertyKey}': property values must be primitives only. Received: ${safeStringify(propertyValue)}`);
     this.name = 'InvalidPropertyError';
     Object.setPrototypeOf(this, InvalidPropertyError.prototype);
   }

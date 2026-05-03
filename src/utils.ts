@@ -58,3 +58,26 @@ export function isPrimitive(value: unknown): boolean {
 export function isFlatRecord(properties: Record<string, unknown>): boolean {
   return Object.values(properties).every(value => isPrimitive(value));
 }
+
+/**
+ * Safely serializes a value to a string for error messages.
+ * Never throws — returns a fallback description for problematic values.
+ * @param value - The value to serialize
+ * @returns A string representation of the value
+ */
+export function safeStringify(value: unknown): string {
+  if (value === null) return 'null';
+  if (value === undefined) return 'undefined';
+  if (typeof value === 'bigint') return 'BigInt';
+  if (typeof value === 'symbol') return 'Symbol';
+  if (typeof value === 'function') return 'Function';
+  if (typeof value === 'object') {
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return Object.prototype.toString.call(value);
+    }
+  }
+  // Primitives (string, number, boolean)
+  return String(value);
+}
