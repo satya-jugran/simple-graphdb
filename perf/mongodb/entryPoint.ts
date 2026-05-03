@@ -152,6 +152,9 @@ async function importIntoMongo(
   // Import the graph structure into MongoDB using factory method
   const graph = await factory.fromGraphData(jsonData, graphId);
 
+  // Create indexes for benchmark query patterns
+  await graph.createIndex('node', 'active');
+
   // Create a new GraphMeta with the MongoDB-backed graph
   return {
     ...memMeta,

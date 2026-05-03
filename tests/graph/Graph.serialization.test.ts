@@ -66,16 +66,16 @@ describe('Graph.Serialization', () => {
   });
 
   it('exportJSON() returns a deep copy — mutating the snapshot does not affect the live graph', async () => {
-    const nodeId = (await graph.addNode('Person', { name: 'Alice', tags: ['a'] })).id;
+    const nodeId = (await graph.addNode('Person', { name: 'Alice', tag: 'a' })).id;
 
     const snapshot = await graph.exportJSON();
     // Mutate the snapshot
     snapshot.nodes[0].properties['name'] = 'Mutated';
-    (snapshot.nodes[0].properties['tags'] as string[]).push('b');
+    snapshot.nodes[0].properties['tag'] = 'b';
 
     // Live graph must be unchanged
     const live = await graph.getNode(nodeId);
     expect(live?.properties['name']).toBe('Alice');
-    expect(live?.properties['tags']).toEqual(['a']);
+    expect(live?.properties['tag']).toBe('a');
   });
 });

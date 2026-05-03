@@ -126,6 +126,68 @@ export interface IStorageProvider {
   getEdgesByTarget(nodeId: string, type?: string): Promise<EdgeData[]>;
 
   // ---------------------------------------------------------------------------
+  // Property mutations
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Adds a property to a node or edge. Fails if the property key already exists.
+   * @param target - Either 'node' or 'edge'
+   * @param id - The id of the node or edge
+   * @param key - The property key to add
+   * @param value - The property value (must be a primitive)
+   * @throws NodeNotFoundError/EdgeNotFoundError if the target doesn't exist
+   * @throws PropertyAlreadyExistsError if the property key already exists
+   * @throws InvalidPropertyError if the value is not a primitive
+   */
+  addProperty(target: 'node' | 'edge', id: string, key: string, value: unknown): Promise<void>;
+
+  /**
+   * Updates an existing property on a node or edge. Fails if the property doesn't exist.
+   * @param target - Either 'node' or 'edge'
+   * @param id - The id of the node or edge
+   * @param key - The property key to update
+   * @param value - The new value (must be a primitive)
+   * @throws NodeNotFoundError/EdgeNotFoundError if the target doesn't exist
+   * @throws PropertyNotFoundError if the property key doesn't exist
+   * @throws InvalidPropertyError if the value is not a primitive
+   */
+  updateProperty(target: 'node' | 'edge', id: string, key: string, value: unknown): Promise<void>;
+
+  /**
+   * Deletes a property from a node or edge.
+   * @param target - Either 'node' or 'edge'
+   * @param id - The id of the node or edge
+   * @param key - The property key to delete
+   * @throws NodeNotFoundError/EdgeNotFoundError if the target doesn't exist
+   */
+  deleteProperty(target: 'node' | 'edge', id: string, key: string): Promise<void>;
+
+  /**
+   * Clears all properties from a node or edge.
+   * @param target - Either 'node' or 'edge'
+   * @param id - The id of the node or edge
+   * @throws NodeNotFoundError/EdgeNotFoundError if the target doesn't exist
+   */
+  clearProperties(target: 'node' | 'edge', id: string): Promise<void>;
+
+  // ---------------------------------------------------------------------------
+  // Index management
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Creates an index on a node or edge property.
+   *
+   * @param target - Either 'node' or 'edge'
+   * @param propertyKey - The property name to index
+   * @param type - Optional type filter. If provided (not '*' or undefined), creates a compound index on (type, propertyKey)
+   *
+   * Behavior:
+   * - If type is undefined or '*': creates a simple index on propertyKey only
+   * - If type is specified (e.g., 'User'): creates a compound index on (type, propertyKey)
+   */
+  createIndex(target: 'node' | 'edge', propertyKey: string, type?: string): Promise<void>;
+
+  // ---------------------------------------------------------------------------
   // Data portability
   // ---------------------------------------------------------------------------
 

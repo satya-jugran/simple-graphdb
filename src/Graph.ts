@@ -269,6 +269,99 @@ export class Graph {
   }
 
   // ---------------------------------------------------------------------------
+  // Node property mutations
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Adds a property to a node. Fails if the property key already exists.
+   * @param nodeId - The id of the node
+   * @param key - The property key to add
+   * @param value - The property value (must be a primitive)
+   */
+  async addNodeProperty(nodeId: string, key: string, value: unknown): Promise<void> {
+    return this._index.addNodeProperty(nodeId, key, value);
+  }
+
+  /**
+   * Updates an existing property on a node. Fails if the property doesn't exist.
+   * @param nodeId - The id of the node
+   * @param key - The property key to update
+   * @param value - The new value (must be a primitive)
+   */
+  async updateNodeProperty(nodeId: string, key: string, value: unknown): Promise<void> {
+    return this._index.updateNodeProperty(nodeId, key, value);
+  }
+
+  /**
+   * Deletes a property from a node.
+   * @param nodeId - The id of the node
+   * @param key - The property key to delete
+   */
+  async deleteNodeProperty(nodeId: string, key: string): Promise<void> {
+    return this._index.deleteNodeProperty(nodeId, key);
+  }
+
+  /**
+   * Clears all properties from a node.
+   * @param nodeId - The id of the node
+   */
+  async clearNodeProperties(nodeId: string): Promise<void> {
+    return this._index.clearNodeProperties(nodeId);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Edge property mutations
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Adds a property to an edge. Fails if the property key already exists.
+   * @param edgeId - The id of the edge
+   * @param key - The property key to add
+   * @param value - The property value (must be a primitive)
+   */
+  async addEdgeProperty(edgeId: string, key: string, value: unknown): Promise<void> {
+    return this._index.addEdgeProperty(edgeId, key, value);
+  }
+
+  /**
+   * Updates an existing property on an edge. Fails if the property doesn't exist.
+   * @param edgeId - The id of the edge
+   * @param key - The property key to update
+   * @param value - The new value (must be a primitive)
+   */
+  async updateEdgeProperty(edgeId: string, key: string, value: unknown): Promise<void> {
+    return this._index.updateEdgeProperty(edgeId, key, value);
+  }
+
+  /**
+   * Deletes a property from an edge.
+   * @param edgeId - The id of the edge
+   * @param key - The property key to delete
+   */
+  async deleteEdgeProperty(edgeId: string, key: string): Promise<void> {
+    return this._index.deleteEdgeProperty(edgeId, key);
+  }
+
+  /**
+   * Clears all properties from an edge.
+   * @param edgeId - The id of the edge
+   */
+  async clearEdgeProperties(edgeId: string): Promise<void> {
+    return this._index.clearEdgeProperties(edgeId);
+  }
+
+  /**
+   * Creates an index on a node or edge property.
+   *
+   * @param target - Either 'node' or 'edge'
+   * @param propertyKey - The property name to index
+   * @param type - Optional type filter. If provided (not '*' or undefined), creates a compound index on (type, propertyKey)
+   */
+  async createIndex(target: 'node' | 'edge', propertyKey: string, type?: string): Promise<void> {
+    return this._index.createIndex(target, propertyKey, type);
+  }
+
+  // ---------------------------------------------------------------------------
   // Data portability — export / import
   // ---------------------------------------------------------------------------
 

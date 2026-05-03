@@ -12,7 +12,12 @@ import {
   NodeAlreadyExistsError,
   EdgeAlreadyExistsError,
   NodeNotFoundError,
+  EdgeNotFoundError,
+  InvalidPropertyError,
+  PropertyAlreadyExistsError,
+  PropertyNotFoundError,
 } from '../errors';
+import { isPrimitive } from '../utils';
 
 /**
  * MongoDB document shape for nodes.
@@ -406,6 +411,164 @@ export class MongoStorageProvider implements IStorageProvider {
       for (let i = 0; i < edgeDocs.length; i += this._batchSize) {
         await this._edges.insertMany(edgeDocs.slice(i, i + this._batchSize));
       }
+    }
+  }
+
+  /**
+   * Creates an index on a node or edge property.
+   *
+   * @param target - Either 'node' or 'edge'
+   * @param propertyKey - The property name to index
+   * @param type - Optional type filter. If provided (not '*' or undefined), creates a compound index on (type, propertyKey)
+   */
+  async createIndex(target: 'node' | 'edge', propertyKey: string, type?: string): Promise<void> {
+    if (target === 'node') {
+      // Always lead with graphId to support partitioned queries efficiently
+      const indexFields: Record<string, 1> = { graphId: 1, [`properties.${propertyKey}`]: 1 };
+      
+      // If type is specified, create compound index on (graphId, type, propertyKey)
+      if (type && type !== '*') {
+        indexFields['type'] = 1;
+        await this._nodes.createIndex(indexFields, {
+          name: `node_graphId_type_${propertyKey}`,
+          background: true
+        });
+      } else {
+        await this._nodes.createIndex(indexFields, {
+          name: `node_graphId_${propertyKey}`,
+          background: true
+        });
+      }
+    } else {
+      // Always lead with graphId to support partitioned queries efficiently
+      const indexFields: Record<string, 1> = { graphId: 1, [`properties.${propertyKey}`]: 1 };
+      
+      // If type is specified, create compound index on (graphId, type, propertyKey)
+      if (type && type !== '*') {
+        indexFields['type'] = 1;
+        await this._edges.createIndex(indexFields, {
+          name: `edge_graphId_type_${propertyKey}`,
+          background: true
+        });
+      } else {
+        await this._edges.createIndex(indexFields, {
+          name: `edge_graphId_${propertyKey}`,
+          background: true
+        });
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Property mutations
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Adds a property to a node or edge. Fails if the property key already exists.
+   * @throws NodeNotFoundError/EdgeNotFoundError if the target doesn't exist
+   * @throws PropertyAlreadyExistsError if the property key already exists
+   * @throws InvalidPropertyError if the value is not a primitive
+   */
+  async addProperty(target: 'node' | 'edge', id: string, key: string, value: unknown): Promise<void> {
+    if (!isPrimitive(value)) {
+      throw new InvalidPropertyError(key, value);
+    }
+
+    const collection = target === 'node' ? this._nodes : this._edges;
+
+    // Atomic: only succeeds if the property does NOT already exist
+    const result = await collection.updateOne(
+      { graphId: this._graphId, id, [`properties.${key}`]: { $exists: false } },
+      { $set: { [`properties.${key}`]: value } }
+    );
+
+    if (result.matchedCount === 0) {
+      // Check if record exists to differentiate between "record missing" vs "property exists"
+      const record = target === 'node' ? await this.getNode(id) : await this.getEdge(id);
+      if (!record) {
+        throw target === 'node' ? new NodeNotFoundError(id) : new EdgeNotFoundError(id);
+      }
+      throw new PropertyAlreadyExistsError(target, id, key);
+    }
+  }
+
+  /**
+   * Updates an existing property on a node or edge. Fails if the property doesn't exist.
+   * @throws NodeNotFoundError/EdgeNotFoundError if the target doesn't exist
+   * @throws PropertyNotFoundError if the property key doesn't exist
+   * @throws InvalidPropertyError if the value is not a primitive
+   */
+  async updateProperty(target: 'node' | 'edge', id: string, key: string, value: unknown): Promise<void> {
+    if (!isPrimitive(value)) {
+      throw new InvalidPropertyError(key, value);
+    }
+
+    const collection = target === 'node' ? this._nodes : this._edges;
+
+    // Atomic update: only succeeds if the property already exists
+    const result = await collection.updateOne(
+      { graphId: this._graphId, id, [`properties.${key}`]: { $exists: true } },
+      { $set: { [`properties.${key}`]: value } }
+    );
+
+    if (result.matchedCount === 0) {
+      // Determine whether it was the record or the property that didn't exist
+      const record = target === 'node' ? await this.getNode(id) : await this.getEdge(id);
+      if (!record) {
+        throw target === 'node' ? new NodeNotFoundError(id) : new EdgeNotFoundError(id);
+      }
+      throw new PropertyNotFoundError(target, id, key);
+    }
+  }
+
+  /**
+   * Deletes a property from a node or edge.
+   * @throws NodeNotFoundError/EdgeNotFoundError if the target doesn't exist
+   */
+  async deleteProperty(target: 'node' | 'edge', id: string, key: string): Promise<void> {
+    const collection = target === 'node' ? this._nodes : this._edges;
+    const record = target === 'node' ? await this.getNode(id) : await this.getEdge(id);
+    
+    if (!record) {
+      if (target === 'node') {
+        throw new NodeNotFoundError(id);
+      } else {
+        throw new EdgeNotFoundError(id);
+      }
+    }
+
+    await collection.updateOne(
+      { graphId: this._graphId, id },
+      { $unset: { [`properties.${key}`]: '' } }
+    );
+  }
+
+  /**
+   * Clears all properties from a node or edge.
+   * @throws NodeNotFoundError/EdgeNotFoundError if the target doesn't exist
+   */
+  async clearProperties(target: 'node' | 'edge', id: string): Promise<void> {
+    const collection = target === 'node' ? this._nodes : this._edges;
+    const record = target === 'node' ? await this.getNode(id) : await this.getEdge(id);
+    
+    if (!record) {
+      if (target === 'node') {
+        throw new NodeNotFoundError(id);
+      } else {
+        throw new EdgeNotFoundError(id);
+      }
+    }
+
+    const updateObj: Record<string, unknown> = {};
+    for (const key of Object.keys(record.properties)) {
+      updateObj[`properties.${key}`] = '';
+    }
+
+    if (Object.keys(updateObj).length > 0) {
+      await collection.updateOne(
+        { graphId: this._graphId, id },
+        { $unset: updateObj }
+      );
     }
   }
 

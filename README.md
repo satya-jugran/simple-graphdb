@@ -21,6 +21,11 @@ A lightweight **async-first** TypeScript graph database with **pluggable storage
 - **Topological sort** — Kahn's algorithm, returns dependency order
 - **DAG detection** — cycle detection for acyclic graph validation
 
+### Property Management
+- **Flat property structure** — properties must be supported primitive types only (string, number, boolean, null, undefined)
+- **Property CRUD** — add, update, delete, and clear properties on nodes and edges
+- **Custom indexes** — `createIndex()` for property-specific indexes including compound indexes with type
+
 ### Visualization
 - **Mermaid export** — generate flowchart diagrams from graph data
 
@@ -178,6 +183,16 @@ Omit `storageProvider` to use the built-in `InMemoryStorageProvider`.
 | `getNodesByType(type)` | `Promise<Node[]>` | Get all nodes of a given type |
 | `getNodesByProperty(key, value, opts?)` | `Promise<Node[]>` | Get nodes by property value, optionally filtered by node type |
 
+#### Node Property Operations
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `addNodeProperty(nodeId, key, value)` | `Promise<void>` | Add a supported primitive property to a node |
+| `updateNodeProperty(nodeId, key, value)` | `Promise<void>` | Update an existing property on a node |
+| `deleteNodeProperty(nodeId, key)` | `Promise<void>` | Delete a property from a node |
+| `clearNodeProperties(nodeId)` | `Promise<void>` | Remove all properties from a node |
+| `createIndex('node', propertyKey, type?)` | `Promise<void>` | Create index on node property, optionally compound with type |
+
 #### Edge Operations
 
 | Method | Returns | Description |
@@ -188,6 +203,16 @@ Omit `storageProvider` to use the built-in `InMemoryStorageProvider`.
 | `hasEdge(id)` | `Promise<boolean>` | Check if edge exists |
 | `getEdges()` | `Promise<readonly Edge[]>` | Get all edges |
 | `getEdgesByType(type)` | `Promise<Edge[]>` | Get all edges of a given relationship type |
+
+#### Edge Property Operations
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `addEdgeProperty(edgeId, key, value)` | `Promise<void>` | Add a supported primitive property to an edge |
+| `updateEdgeProperty(edgeId, key, value)` | `Promise<void>` | Update an existing property on an edge |
+| `deleteEdgeProperty(edgeId, key)` | `Promise<void>` | Delete a property from an edge |
+| `clearEdgeProperties(edgeId)` | `Promise<void>` | Remove all properties from an edge |
+| `createIndex('edge', propertyKey, type?)` | `Promise<void>` | Create index on edge property, optionally compound with type |
 
 #### Navigation
 
@@ -371,6 +396,9 @@ Available error classes:
 - `EdgeNotFoundError`
 - `NodeHasEdgesError` — thrown by `removeNode(id)` when the node has incident edges and `cascade` is not `true`
 - `InvalidGraphDataError`
+- `InvalidPropertyError` — thrown when property value is not a supported primitive type
+- `PropertyAlreadyExistsError` — thrown by `addNodeProperty`/`addEdgeProperty` when property already exists
+- `PropertyNotFoundError` — thrown by `updateNodeProperty`/`updateEdgeProperty` when property does not exist
 
 ## Serialization & Persistence
 
@@ -421,7 +449,7 @@ class MyCustomProvider implements IStorageProvider {
   async deleteNode(id: string): Promise<void> { /* ... */ }
   async hasNode(id: string): Promise<boolean> { /* ... */ }
   async getNode(id: string): Promise<NodeData | undefined> { /* ... */ }
-  async getAllNodes(): Promise<NodeData[]> { /* ... */ }
+  async getAllNodes(limit?: number): Promise<NodeData[]> { /* ... */ }
   async getNodesByType(type: string): Promise<NodeData[]> { /* ... */ }
   async getNodesByProperty(key: string, value: unknown, nodeType?: string): Promise<NodeData[]> { /* ... */ }
   async insertEdge(edge: EdgeData): Promise<void> { /* ... */ }
@@ -430,8 +458,13 @@ class MyCustomProvider implements IStorageProvider {
   async getEdge(id: string): Promise<EdgeData | undefined> { /* ... */ }
   async getAllEdges(): Promise<EdgeData[]> { /* ... */ }
   async getEdgesByType(type: string): Promise<EdgeData[]> { /* ... */ }
-  async getEdgesBySource(nodeId: string): Promise<EdgeData[]> { /* ... */ }
-  async getEdgesByTarget(nodeId: string): Promise<EdgeData[]> { /* ... */ }
+  async getEdgesBySource(nodeId: string, type?: string): Promise<EdgeData[]> { /* ... */ }
+  async getEdgesByTarget(nodeId: string, type?: string): Promise<EdgeData[]> { /* ... */ }
+  async createIndex(target: 'node' | 'edge', propertyKey: string, type?: string): Promise<void> { /* ... */ }
+  async addProperty(target: 'node' | 'edge', id: string, key: string, value: unknown): Promise<void> { /* ... */ }
+  async updateProperty(target: 'node' | 'edge', id: string, key: string, value: unknown): Promise<void> { /* ... */ }
+  async deleteProperty(target: 'node' | 'edge', id: string, key: string): Promise<void> { /* ... */ }
+  async clearProperties(target: 'node' | 'edge', id: string): Promise<void> { /* ... */ }
   async exportJSON(): Promise<GraphData> { /* ... */ }
   async importJSON(data: GraphData): Promise<void> { /* ... */ }
   async clear(): Promise<void> { /* ... */ }
@@ -449,13 +482,13 @@ npm install
 # Build TypeScript
 npm run build
 
-# Run tests (313 tests)
+# Run tests (367 tests)
 npm test
 ```
 
 ## Testing
 
-The test suite (313 tests across 16 suites) runs against both `InMemoryStorageProvider` and `MongoStorageProvider` backends:
+The test suite (367 tests across 18 suites) runs against both `InMemoryStorageProvider` and `MongoStorageProvider` backends:
 
 ### In-Memory Tests
 - `tests/graph/Graph.node.test.ts` — Node operations
@@ -466,6 +499,7 @@ The test suite (313 tests across 16 suites) runs against both `InMemoryStoragePr
 - `tests/graph/Graph.topologicalSort.test.ts` — Topological ordering
 - `tests/graph/Graph.fromJSON.test.ts` — JSON validation
 - `tests/graph/Graph.clear.test.ts` — Graph clearing
+- `tests/graph/Graph.properties.test.ts` — Property CRUD and validation
 - `tests/graph/GraphToMermaid.test.ts` — Mermaid export
 
 ### Cross-Provider Scenarios (InMemory + MongoDB)
