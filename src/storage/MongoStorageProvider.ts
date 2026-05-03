@@ -475,24 +475,21 @@ export class MongoStorageProvider implements IStorageProvider {
     }
 
     const collection = target === 'node' ? this._nodes : this._edges;
-    const record = target === 'node' ? await this.getNode(id) : await this.getEdge(id);
-    
-    if (!record) {
-      if (target === 'node') {
-        throw new NodeNotFoundError(id);
-      } else {
-        throw new EdgeNotFoundError(id);
-      }
-    }
 
-    if (key in record.properties) {
-      throw new PropertyAlreadyExistsError(target, id, key);
-    }
-
-    await collection.updateOne(
-      { graphId: this._graphId, id },
+    // Atomic: only succeeds if the property does NOT already exist
+    const result = await collection.updateOne(
+      { graphId: this._graphId, id, [`properties.${key}`]: { $exists: false } },
       { $set: { [`properties.${key}`]: value } }
     );
+
+    if (result.matchedCount === 0) {
+      // Check if record exists to differentiate between "record missing" vs "property exists"
+      const record = target === 'node' ? await this.getNode(id) : await this.getEdge(id);
+      if (!record) {
+        throw target === 'node' ? new NodeNotFoundError(id) : new EdgeNotFoundError(id);
+      }
+      throw new PropertyAlreadyExistsError(target, id, key);
+    }
   }
 
   /**
