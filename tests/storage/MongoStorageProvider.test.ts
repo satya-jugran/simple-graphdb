@@ -8,6 +8,10 @@ import {
   NodeAlreadyExistsError,
   EdgeAlreadyExistsError,
   NodeNotFoundError,
+  EdgeNotFoundError,
+  PropertyAlreadyExistsError,
+  PropertyNotFoundError,
+  InvalidPropertyError,
 } from '../../src/errors';
 
 describe('MongoStorageProvider', () => {
@@ -418,5 +422,111 @@ describe('MongoStorageProvider', () => {
     await expect(
       providerB.insertNode({ id: 'n1', type: 'Person', properties: {} })
     ).resolves.toBeUndefined();
+  });
+
+  // ---------------------------------------------------------------------------
+  // Property mutations
+  // ---------------------------------------------------------------------------
+
+  it('addProperty() should add a property to a node', async () => {
+    await provider.insertNode({ id: 'n1', type: 'Person', properties: {} });
+    await provider.addProperty('node', 'n1', 'name', 'Alice');
+
+    const node = await provider.getNode('n1');
+    expect(node?.properties.name).toBe('Alice');
+  });
+
+  it('addProperty() should throw PropertyAlreadyExistsError if property already exists', async () => {
+    await provider.insertNode({ id: 'n1', type: 'Person', properties: { name: 'Alice' } });
+    await expect(
+      provider.addProperty('node', 'n1', 'name', 'Bob')
+    ).rejects.toThrow(PropertyAlreadyExistsError);
+  });
+
+  it('addProperty() should throw NodeNotFoundError for non-existent node', async () => {
+    await expect(
+      provider.addProperty('node', 'non-existent', 'name', 'Alice')
+    ).rejects.toThrow(NodeNotFoundError);
+  });
+
+  it('addProperty() should throw EdgeNotFoundError for non-existent edge', async () => {
+    await expect(
+      provider.addProperty('edge', 'non-existent', 'weight', 5)
+    ).rejects.toThrow(EdgeNotFoundError);
+  });
+
+  it('addProperty() should throw InvalidPropertyError for non-primitive value', async () => {
+    await provider.insertNode({ id: 'n1', type: 'Person', properties: {} });
+    await expect(
+      provider.addProperty('node', 'n1', 'meta', { nested: true })
+    ).rejects.toThrow(InvalidPropertyError);
+  });
+
+  it('updateProperty() should update an existing property', async () => {
+    await provider.insertNode({ id: 'n1', type: 'Person', properties: { age: 25 } });
+    await provider.updateProperty('node', 'n1', 'age', 30);
+
+    const node = await provider.getNode('n1');
+    expect(node?.properties.age).toBe(30);
+  });
+
+  it('updateProperty() should throw PropertyNotFoundError if property does not exist', async () => {
+    await provider.insertNode({ id: 'n1', type: 'Person', properties: {} });
+    await expect(
+      provider.updateProperty('node', 'n1', 'name', 'Alice')
+    ).rejects.toThrow(PropertyNotFoundError);
+  });
+
+  it('updateProperty() should throw NodeNotFoundError for non-existent node', async () => {
+    await expect(
+      provider.updateProperty('node', 'non-existent', 'name', 'Alice')
+    ).rejects.toThrow(NodeNotFoundError);
+  });
+
+  it('deleteProperty() should remove a property from a node', async () => {
+    await provider.insertNode({ id: 'n1', type: 'Person', properties: { name: 'Alice', age: 25 } });
+    await provider.deleteProperty('node', 'n1', 'name');
+
+    const node = await provider.getNode('n1');
+    expect(node?.properties).toEqual({ age: 25 });
+  });
+
+  it('clearProperties() should remove all properties from a node', async () => {
+    await provider.insertNode({ id: 'n1', type: 'Person', properties: { name: 'Alice', age: 25 } });
+    await provider.clearProperties('node', 'n1');
+
+    const node = await provider.getNode('n1');
+    expect(node?.properties).toEqual({});
+  });
+
+  it('clearProperties() should throw NodeNotFoundError for non-existent node', async () => {
+    await expect(
+      provider.clearProperties('node', 'non-existent')
+    ).rejects.toThrow(NodeNotFoundError);
+  });
+
+  // ---------------------------------------------------------------------------
+  // createIndex
+  // ---------------------------------------------------------------------------
+
+  it('createIndex() should create a simple index on node property', async () => {
+    await provider.createIndex('node', 'email');
+    // Index creation is idempotent — calling again should not throw
+    await expect(provider.createIndex('node', 'email')).resolves.toBeUndefined();
+  });
+
+  it('createIndex() should create a compound index on node property with type', async () => {
+    await provider.createIndex('node', 'email', 'Person');
+    await expect(provider.createIndex('node', 'email', 'Person')).resolves.toBeUndefined();
+  });
+
+  it('createIndex() should create a simple index on edge property', async () => {
+    await provider.createIndex('edge', 'weight');
+    await expect(provider.createIndex('edge', 'weight')).resolves.toBeUndefined();
+  });
+
+  it('createIndex() should create a compound index on edge property with type', async () => {
+    await provider.createIndex('edge', 'weight', 'LIKES');
+    await expect(provider.createIndex('edge', 'weight', 'LIKES')).resolves.toBeUndefined();
   });
 });

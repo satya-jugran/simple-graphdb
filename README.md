@@ -482,13 +482,13 @@ npm install
 # Build TypeScript
 npm run build
 
-# Run tests (134 tests)
+# Run tests (367 tests)
 npm test
 ```
 
 ## Testing
 
-The test suite (134 tests across 17 suites) runs against both `InMemoryStorageProvider` and `MongoStorageProvider` backends:
+The test suite (367 tests across 18 suites) runs against both `InMemoryStorageProvider` and `MongoStorageProvider` backends:
 
 ### In-Memory Tests
 - `tests/graph/Graph.node.test.ts` — Node operations
