@@ -126,86 +126,49 @@ export interface IStorageProvider {
   getEdgesByTarget(nodeId: string, type?: string): Promise<EdgeData[]>;
 
   // ---------------------------------------------------------------------------
-  // Node property mutations
+  // Property mutations
   // ---------------------------------------------------------------------------
 
   /**
-   * Adds a property to a node. Fails if the property key already exists.
-   * @param nodeId - The id of the node
+   * Adds a property to a node or edge. Fails if the property key already exists.
+   * @param target - Either 'node' or 'edge'
+   * @param id - The id of the node or edge
    * @param key - The property key to add
    * @param value - The property value (must be a primitive)
-   * @throws NodeNotFoundError if the node doesn't exist
+   * @throws NodeNotFoundError/EdgeNotFoundError if the target doesn't exist
    * @throws PropertyAlreadyExistsError if the property key already exists
    * @throws InvalidPropertyError if the value is not a primitive
    */
-  addNodeProperty(nodeId: string, key: string, value: unknown): Promise<void>;
+  addProperty(target: 'node' | 'edge', id: string, key: string, value: unknown): Promise<void>;
 
   /**
-   * Updates an existing property on a node. Fails if the property doesn't exist.
-   * @param nodeId - The id of the node
+   * Updates an existing property on a node or edge. Fails if the property doesn't exist.
+   * @param target - Either 'node' or 'edge'
+   * @param id - The id of the node or edge
    * @param key - The property key to update
    * @param value - The new value (must be a primitive)
-   * @throws NodeNotFoundError if the node doesn't exist
+   * @throws NodeNotFoundError/EdgeNotFoundError if the target doesn't exist
    * @throws PropertyNotFoundError if the property key doesn't exist
    * @throws InvalidPropertyError if the value is not a primitive
    */
-  updateNodeProperty(nodeId: string, key: string, value: unknown): Promise<void>;
+  updateProperty(target: 'node' | 'edge', id: string, key: string, value: unknown): Promise<void>;
 
   /**
-   * Deletes a property from a node.
-   * @param nodeId - The id of the node
+   * Deletes a property from a node or edge.
+   * @param target - Either 'node' or 'edge'
+   * @param id - The id of the node or edge
    * @param key - The property key to delete
-   * @throws NodeNotFoundError if the node doesn't exist
+   * @throws NodeNotFoundError/EdgeNotFoundError if the target doesn't exist
    */
-  deleteNodeProperty(nodeId: string, key: string): Promise<void>;
+  deleteProperty(target: 'node' | 'edge', id: string, key: string): Promise<void>;
 
   /**
-   * Clears all properties from a node.
-   * @param nodeId - The id of the node
-   * @throws NodeNotFoundError if the node doesn't exist
+   * Clears all properties from a node or edge.
+   * @param target - Either 'node' or 'edge'
+   * @param id - The id of the node or edge
+   * @throws NodeNotFoundError/EdgeNotFoundError if the target doesn't exist
    */
-  clearNodeProperties(nodeId: string): Promise<void>;
-
-  // ---------------------------------------------------------------------------
-  // Edge property mutations
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Adds a property to an edge. Fails if the property key already exists.
-   * @param edgeId - The id of the edge
-   * @param key - The property key to add
-   * @param value - The property value (must be a primitive)
-   * @throws EdgeNotFoundError if the edge doesn't exist
-   * @throws PropertyAlreadyExistsError if the property key already exists
-   * @throws InvalidPropertyError if the value is not a primitive
-   */
-  addEdgeProperty(edgeId: string, key: string, value: unknown): Promise<void>;
-
-  /**
-   * Updates an existing property on an edge. Fails if the property doesn't exist.
-   * @param edgeId - The id of the edge
-   * @param key - The property key to update
-   * @param value - The new value (must be a primitive)
-   * @throws EdgeNotFoundError if the edge doesn't exist
-   * @throws PropertyNotFoundError if the property key doesn't exist
-   * @throws InvalidPropertyError if the value is not a primitive
-   */
-  updateEdgeProperty(edgeId: string, key: string, value: unknown): Promise<void>;
-
-  /**
-   * Deletes a property from an edge.
-   * @param edgeId - The id of the edge
-   * @param key - The property key to delete
-   * @throws EdgeNotFoundError if the edge doesn't exist
-   */
-  deleteEdgeProperty(edgeId: string, key: string): Promise<void>;
-
-  /**
-   * Clears all properties from an edge.
-   * @param edgeId - The id of the edge
-   * @throws EdgeNotFoundError if the edge doesn't exist
-   */
-  clearEdgeProperties(edgeId: string): Promise<void>;
+  clearProperties(target: 'node' | 'edge', id: string): Promise<void>;
 
   // ---------------------------------------------------------------------------
   // Index management

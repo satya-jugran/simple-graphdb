@@ -334,7 +334,7 @@ export class GraphIndex {
     if (!isPrimitive(value)) {
       throw new InvalidPropertyError(key, value);
     }
-    await this._store.addNodeProperty(nodeId, key, value);
+    await this._store.addProperty('node', nodeId, key, value);
   }
 
   /**
@@ -345,21 +345,21 @@ export class GraphIndex {
     if (!isPrimitive(value)) {
       throw new InvalidPropertyError(key, value);
     }
-    await this._store.updateNodeProperty(nodeId, key, value);
+    await this._store.updateProperty('node', nodeId, key, value);
   }
 
   /**
    * Deletes a property from a node.
    */
   async deleteNodeProperty(nodeId: string, key: string): Promise<void> {
-    await this._store.deleteNodeProperty(nodeId, key);
+    await this._store.deleteProperty('node', nodeId, key);
   }
 
   /**
    * Clears all properties from a node.
    */
   async clearNodeProperties(nodeId: string): Promise<void> {
-    await this._store.clearNodeProperties(nodeId);
+    await this._store.clearProperties('node', nodeId);
   }
 
   // ---------------------------------------------------------------------------
@@ -374,7 +374,7 @@ export class GraphIndex {
     if (!isPrimitive(value)) {
       throw new InvalidPropertyError(key, value);
     }
-    await this._store.addEdgeProperty(edgeId, key, value);
+    await this._store.addProperty('edge', edgeId, key, value);
   }
 
   /**
@@ -385,21 +385,21 @@ export class GraphIndex {
     if (!isPrimitive(value)) {
       throw new InvalidPropertyError(key, value);
     }
-    await this._store.updateEdgeProperty(edgeId, key, value);
+    await this._store.updateProperty('edge', edgeId, key, value);
   }
 
   /**
    * Deletes a property from an edge.
    */
   async deleteEdgeProperty(edgeId: string, key: string): Promise<void> {
-    await this._store.deleteEdgeProperty(edgeId, key);
+    await this._store.deleteProperty('edge', edgeId, key);
   }
 
   /**
    * Clears all properties from an edge.
    */
   async clearEdgeProperties(edgeId: string): Promise<void> {
-    await this._store.clearEdgeProperties(edgeId);
+    await this._store.clearProperties('edge', edgeId);
   }
 
   // ---------------------------------------------------------------------------

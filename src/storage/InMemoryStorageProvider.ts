@@ -412,182 +412,127 @@ export class InMemoryStorageProvider implements IStorageProvider {
   }
 
   // ---------------------------------------------------------------------------
-  // ---------------------------------------------------------------------------
-  // Node property mutations
+  // Property mutations
   // ---------------------------------------------------------------------------
 
   /**
-   * Adds a property to a node. Fails if the property key already exists.
-   * @throws NodeNotFoundError if the node doesn't exist
+   * Adds a property to a node or edge. Fails if the property key already exists.
+   * @throws NodeNotFoundError/EdgeNotFoundError if the target doesn't exist
    * @throws PropertyAlreadyExistsError if the property key already exists
    * @throws InvalidPropertyError if the value is not a primitive
    */
-  async addNodeProperty(nodeId: string, key: string, value: unknown): Promise<void> {
+  async addProperty(target: 'node' | 'edge', id: string, key: string, value: unknown): Promise<void> {
     if (!isPrimitive(value)) {
       throw new InvalidPropertyError(key, value);
     }
 
-    const node = this._nodes.get(nodeId);
-    if (!node) {
-      throw new NodeNotFoundError(nodeId);
+    const record = target === 'node' ? this._nodes.get(id) : this._edges.get(id);
+    if (!record) {
+      if (target === 'node') {
+        throw new NodeNotFoundError(id);
+      } else {
+        throw new EdgeNotFoundError(id);
+      }
     }
 
-    if (key in node.properties) {
-      throw new PropertyAlreadyExistsError('node', nodeId, key);
+    if (key in record.properties) {
+      throw new PropertyAlreadyExistsError(target, id, key);
     }
 
-    node.properties = { ...node.properties, [key]: value };
-    this._indexNodeProperty(nodeId, key, value);
+    record.properties = { ...record.properties, [key]: value };
+    
+    if (target === 'node') {
+      this._indexNodeProperty(id, key, value);
+    } else {
+      this._indexEdgeProperty(id, key, value);
+    }
   }
 
   /**
-   * Updates an existing property on a node. Fails if the property doesn't exist.
-   * @throws NodeNotFoundError if the node doesn't exist
+   * Updates an existing property on a node or edge. Fails if the property doesn't exist.
+   * @throws NodeNotFoundError/EdgeNotFoundError if the target doesn't exist
    * @throws PropertyNotFoundError if the property key doesn't exist
    * @throws InvalidPropertyError if the value is not a primitive
    */
-  async updateNodeProperty(nodeId: string, key: string, value: unknown): Promise<void> {
+  async updateProperty(target: 'node' | 'edge', id: string, key: string, value: unknown): Promise<void> {
     if (!isPrimitive(value)) {
       throw new InvalidPropertyError(key, value);
     }
 
-    const node = this._nodes.get(nodeId);
-    if (!node) {
-      throw new NodeNotFoundError(nodeId);
+    const record = target === 'node' ? this._nodes.get(id) : this._edges.get(id);
+    if (!record) {
+      if (target === 'node') {
+        throw new NodeNotFoundError(id);
+      } else {
+        throw new EdgeNotFoundError(id);
+      }
     }
 
-    if (!(key in node.properties)) {
-      throw new PropertyNotFoundError('node', nodeId, key);
+    if (!(key in record.properties)) {
+      throw new PropertyNotFoundError(target, id, key);
     }
 
-    const oldValue = node.properties[key];
-    node.properties = { ...node.properties, [key]: value };
+    const oldValue = record.properties[key];
+    record.properties = { ...record.properties, [key]: value };
 
     // Update index: remove from old value map, add to new
-    this._unindexNodeProperty(nodeId, key, oldValue);
-    this._indexNodeProperty(nodeId, key, value);
+    if (target === 'node') {
+      this._unindexNodeProperty(id, key, oldValue);
+      this._indexNodeProperty(id, key, value);
+    } else {
+      this._unindexEdgeProperty(id, key, oldValue);
+      this._indexEdgeProperty(id, key, value);
+    }
   }
 
   /**
-   * Deletes a property from a node.
-   * @throws NodeNotFoundError if the node doesn't exist
+   * Deletes a property from a node or edge.
+   * @throws NodeNotFoundError/EdgeNotFoundError if the target doesn't exist
    */
-  async deleteNodeProperty(nodeId: string, key: string): Promise<void> {
-    const node = this._nodes.get(nodeId);
-    if (!node) {
-      throw new NodeNotFoundError(nodeId);
+  async deleteProperty(target: 'node' | 'edge', id: string, key: string): Promise<void> {
+    const record = target === 'node' ? this._nodes.get(id) : this._edges.get(id);
+    if (!record) {
+      if (target === 'node') {
+        throw new NodeNotFoundError(id);
+      } else {
+        throw new EdgeNotFoundError(id);
+      }
     }
 
-    const oldValue = node.properties[key];
-    delete node.properties[key];
-    this._unindexNodeProperty(nodeId, key, oldValue);
+    const oldValue = record.properties[key];
+    delete record.properties[key];
+    
+    if (target === 'node') {
+      this._unindexNodeProperty(id, key, oldValue);
+    } else {
+      this._unindexEdgeProperty(id, key, oldValue);
+    }
   }
 
   /**
-   * Clears all properties from a node.
-   * @throws NodeNotFoundError if the node doesn't exist
+   * Clears all properties from a node or edge.
+   * @throws NodeNotFoundError/EdgeNotFoundError if the target doesn't exist
    */
-  async clearNodeProperties(nodeId: string): Promise<void> {
-    const node = this._nodes.get(nodeId);
-    if (!node) {
-      throw new NodeNotFoundError(nodeId);
+  async clearProperties(target: 'node' | 'edge', id: string): Promise<void> {
+    const record = target === 'node' ? this._nodes.get(id) : this._edges.get(id);
+    if (!record) {
+      if (target === 'node') {
+        throw new NodeNotFoundError(id);
+      } else {
+        throw new EdgeNotFoundError(id);
+      }
     }
 
     // Unindex all current properties
-    for (const [key, value] of Object.entries(node.properties)) {
-      this._unindexNodeProperty(nodeId, key, value);
+    for (const [key, value] of Object.entries(record.properties)) {
+      if (target === 'node') {
+        this._unindexNodeProperty(id, key, value);
+      } else {
+        this._unindexEdgeProperty(id, key, value);
+      }
     }
 
-    node.properties = {};
-  }
-
-  // ---------------------------------------------------------------------------
-  // Edge property mutations
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Adds a property to an edge. Fails if the property key already exists.
-   * @throws EdgeNotFoundError if the edge doesn't exist
-   * @throws PropertyAlreadyExistsError if the property key already exists
-   * @throws InvalidPropertyError if the value is not a primitive
-   */
-  async addEdgeProperty(edgeId: string, key: string, value: unknown): Promise<void> {
-    if (!isPrimitive(value)) {
-      throw new InvalidPropertyError(key, value);
-    }
-
-    const edge = this._edges.get(edgeId);
-    if (!edge) {
-      throw new EdgeNotFoundError(edgeId);
-    }
-
-    if (key in edge.properties) {
-      throw new PropertyAlreadyExistsError('edge', edgeId, key);
-    }
-
-    edge.properties = { ...edge.properties, [key]: value };
-    this._indexEdgeProperty(edgeId, key, value);
-  }
-
-  /**
-   * Updates an existing property on an edge. Fails if the property doesn't exist.
-   * @throws EdgeNotFoundError if the edge doesn't exist
-   * @throws PropertyNotFoundError if the property key doesn't exist
-   * @throws InvalidPropertyError if the value is not a primitive
-   */
-  async updateEdgeProperty(edgeId: string, key: string, value: unknown): Promise<void> {
-    if (!isPrimitive(value)) {
-      throw new InvalidPropertyError(key, value);
-    }
-
-    const edge = this._edges.get(edgeId);
-    if (!edge) {
-      throw new EdgeNotFoundError(edgeId);
-    }
-
-    if (!(key in edge.properties)) {
-      throw new PropertyNotFoundError('edge', edgeId, key);
-    }
-
-    const oldValue = edge.properties[key];
-    edge.properties = { ...edge.properties, [key]: value };
-
-    // Update index: remove from old value map, add to new
-    this._unindexEdgeProperty(edgeId, key, oldValue);
-    this._indexEdgeProperty(edgeId, key, value);
-  }
-
-  /**
-   * Deletes a property from an edge.
-   * @throws EdgeNotFoundError if the edge doesn't exist
-   */
-  async deleteEdgeProperty(edgeId: string, key: string): Promise<void> {
-    const edge = this._edges.get(edgeId);
-    if (!edge) {
-      throw new EdgeNotFoundError(edgeId);
-    }
-
-    const oldValue = edge.properties[key];
-    delete edge.properties[key];
-    this._unindexEdgeProperty(edgeId, key, oldValue);
-  }
-
-  /**
-   * Clears all properties from an edge.
-   * @throws EdgeNotFoundError if the edge doesn't exist
-   */
-  async clearEdgeProperties(edgeId: string): Promise<void> {
-    const edge = this._edges.get(edgeId);
-    if (!edge) {
-      throw new EdgeNotFoundError(edgeId);
-    }
-
-    // Unindex all current properties
-    for (const [key, value] of Object.entries(edge.properties)) {
-      this._unindexEdgeProperty(edgeId, key, value);
-    }
-
-    edge.properties = {};
+    record.properties = {};
   }
 
   // ---------------------------------------------------------------------------
