@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.2.0] - 2026-05-03
+
+### ✨ New Features
+
+1. **Property Constraints**
+   - Added `isPrimitive()` validation ensuring property values are only primitive types (string, number, boolean, null, undefined, bigint, symbol)
+   - Properties must be flat structure with primitive-only values (no nested objects, no arrays)
+   - `InvalidPropertyError` thrown for non-primitive values
+
+2. **createIndex() Method**
+   - Added `createIndex(target, propertyKey, type?)` method to both `InMemoryStorageProvider` and `MongoStorageProvider`
+   - Supports compound indexes when type is specified: `createIndex('node', 'email', 'Person')` creates index on (type, propertyKey)
+   - Simple indexes created when type is '*' or not specified
+
+3. **Property CRUD Methods**
+   - Unified methods at `IStorageProvider` level: `addProperty`, `updateProperty`, `deleteProperty`, `clearProperties`
+   - Separate convenience methods at `Graph` level for better developer experience:
+     - `addNodeProperty`, `updateNodeProperty`, `deleteNodeProperty`, `clearNodeProperties`
+     - `addEdgeProperty`, `updateEdgeProperty`, `deleteEdgeProperty`, `clearEdgeProperties`
+   - `PropertyAlreadyExistsError` and `PropertyNotFoundError` error classes added
+
+4. **Validation at Public API Boundary**
+   - Property validation moved from internal `Node`/`Edge` constructors to public API boundary (`GraphIndex.addNode`/`addEdge`)
+   - Validation occurs in `addNodeProperty`/`updateNodeProperty` methods
+
 ## [5.1.0] - 2026-05-02
 
 ### ✨ New Features

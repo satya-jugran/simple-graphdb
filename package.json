@@ -1,6 +1,6 @@
 {
   "name": "simple-graphdb",
-  "version": "5.1.0",
+  "version": "5.2.0",
   "description": "A lightweight async-first TypeScript graph database with pluggable storage architecture. Supports multiple isolated graphs via graphId partitioning. Ships with a zero-dependency in-memory provider; optional MongoDB backend for persistence. Includes BFS/DFS traversal, type/property filtering, topological sort, DAG detection, and Mermaid export.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
