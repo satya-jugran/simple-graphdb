@@ -22,7 +22,7 @@ A lightweight **async-first** TypeScript graph database with **pluggable storage
 - **DAG detection** — cycle detection for acyclic graph validation
 
 ### Property Management
-- **Flat property structure** — properties must be primitive types only (string, number, boolean, null, undefined, bigint, symbol)
+- **Flat property structure** — properties must be supported primitive types only (string, number, boolean, null, undefined)
 - **Property CRUD** — add, update, delete, and clear properties on nodes and edges
 - **Custom indexes** — `createIndex()` for property-specific indexes including compound indexes with type
 
@@ -187,7 +187,7 @@ Omit `storageProvider` to use the built-in `InMemoryStorageProvider`.
 
 | Method | Returns | Description |
 |--------|---------|-------------|
-| `addNodeProperty(nodeId, key, value)` | `Promise<void>` | Add a primitive property to a node |
+| `addNodeProperty(nodeId, key, value)` | `Promise<void>` | Add a supported primitive property to a node |
 | `updateNodeProperty(nodeId, key, value)` | `Promise<void>` | Update an existing property on a node |
 | `deleteNodeProperty(nodeId, key)` | `Promise<void>` | Delete a property from a node |
 | `clearNodeProperties(nodeId)` | `Promise<void>` | Remove all properties from a node |
@@ -208,7 +208,7 @@ Omit `storageProvider` to use the built-in `InMemoryStorageProvider`.
 
 | Method | Returns | Description |
 |--------|---------|-------------|
-| `addEdgeProperty(edgeId, key, value)` | `Promise<void>` | Add a primitive property to an edge |
+| `addEdgeProperty(edgeId, key, value)` | `Promise<void>` | Add a supported primitive property to an edge |
 | `updateEdgeProperty(edgeId, key, value)` | `Promise<void>` | Update an existing property on an edge |
 | `deleteEdgeProperty(edgeId, key)` | `Promise<void>` | Delete a property from an edge |
 | `clearEdgeProperties(edgeId)` | `Promise<void>` | Remove all properties from an edge |
@@ -396,7 +396,7 @@ Available error classes:
 - `EdgeNotFoundError`
 - `NodeHasEdgesError` — thrown by `removeNode(id)` when the node has incident edges and `cascade` is not `true`
 - `InvalidGraphDataError`
-- `InvalidPropertyError` — thrown when property value is not a primitive type
+- `InvalidPropertyError` — thrown when property value is not a supported primitive type
 - `PropertyAlreadyExistsError` — thrown by `addNodeProperty`/`addEdgeProperty` when property already exists
 - `PropertyNotFoundError` — thrown by `updateNodeProperty`/`updateEdgeProperty` when property does not exist
 

@@ -34,23 +34,26 @@ export function deepFreeze<T>(obj: T): T {
 }
 
 /**
- * Checks if a value is a primitive type (string, number, boolean, null, undefined, bigint, symbol).
- * @param value - The value to check
- * @returns true if the value is a primitive
+ * Checks if a value is a supported primitive property type
+  * (string, number, boolean, null, undefined).
+  * Excludes `bigint` and `symbol`, which are primitive in JavaScript but are
+  * not supported by the current JSON-based storage/indexing implementation.
+  * @param value - The value to check
+  * @returns true if the value is a supported primitive property type
  */
 export function isPrimitive(value: unknown): boolean {
   if (value === null || value === undefined) {
     return true;
   }
   const type = typeof value;
-  return type !== 'object' && type !== 'function';
+  return type === 'string' || type === 'number' || type === 'boolean';
 }
 
 /**
- * Validates that all property values in a record are primitive types.
+ * Validates that all property values in a record are supported primitive types.
  * This enforces a flat structure for efficient indexing.
  * @param properties - The properties record to validate
- * @returns true if all values are primitives
+ * @returns true if all values are supported primitives
  */
 export function isFlatRecord(properties: Record<string, unknown>): boolean {
   return Object.values(properties).every(value => isPrimitive(value));

@@ -10,9 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### ✨ New Features
 
 1. **Property Constraints**
-   - Added `isPrimitive()` validation ensuring property values are only primitive types (string, number, boolean, null, undefined, bigint, symbol)
-   - Properties must be flat structure with primitive-only values (no nested objects, no arrays)
-   - `InvalidPropertyError` thrown for non-primitive values
+   - Added `isPrimitive()` validation ensuring property values are only supported primitive types (string, number, boolean, null, undefined)
+   - Properties must be flat structure with supported primitive-only values (no nested objects, no arrays)
+   - `InvalidPropertyError` thrown for non-supported primitive values
 
 2. **createIndex() Method**
    - Added `createIndex(target, propertyKey, type?)` method to both `InMemoryStorageProvider` and `MongoStorageProvider`

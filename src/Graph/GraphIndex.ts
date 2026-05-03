@@ -67,7 +67,7 @@ export class GraphIndex {
 
   /**
    * Adds a new node to the graph.
-   * @throws InvalidPropertyError if properties contain non-primitive values
+   * @throws InvalidPropertyError if properties contain non-supported primitive values
    * @throws NodeAlreadyExistsError if a node with this id already exists
    */
   async addNode(type: string, properties: Record<string, unknown> = {}): Promise<Node> {
