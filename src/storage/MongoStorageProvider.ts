@@ -423,34 +423,36 @@ export class MongoStorageProvider implements IStorageProvider {
    */
   async createIndex(target: 'node' | 'edge', propertyKey: string, type?: string): Promise<void> {
     if (target === 'node') {
-      const indexFields: Record<string, 1> = { [`properties.${propertyKey}`]: 1 };
+      // Always lead with graphId to support partitioned queries efficiently
+      const indexFields: Record<string, 1> = { graphId: 1, [`properties.${propertyKey}`]: 1 };
       
-      // If type is specified, create compound index on (type, propertyKey)
+      // If type is specified, create compound index on (graphId, type, propertyKey)
       if (type && type !== '*') {
         indexFields['type'] = 1;
         await this._nodes.createIndex(indexFields, {
-          name: `node_${type}_${propertyKey}`,
+          name: `node_graphId_type_${propertyKey}`,
           background: true
         });
       } else {
         await this._nodes.createIndex(indexFields, {
-          name: `node_${propertyKey}`,
+          name: `node_graphId_${propertyKey}`,
           background: true
         });
       }
     } else {
-      const indexFields: Record<string, 1> = { [`properties.${propertyKey}`]: 1 };
+      // Always lead with graphId to support partitioned queries efficiently
+      const indexFields: Record<string, 1> = { graphId: 1, [`properties.${propertyKey}`]: 1 };
       
-      // If type is specified, create compound index on (type, propertyKey)
+      // If type is specified, create compound index on (graphId, type, propertyKey)
       if (type && type !== '*') {
         indexFields['type'] = 1;
         await this._edges.createIndex(indexFields, {
-          name: `edge_${type}_${propertyKey}`,
+          name: `edge_graphId_type_${propertyKey}`,
           background: true
         });
       } else {
         await this._edges.createIndex(indexFields, {
-          name: `edge_${propertyKey}`,
+          name: `edge_graphId_${propertyKey}`,
           background: true
         });
       }
