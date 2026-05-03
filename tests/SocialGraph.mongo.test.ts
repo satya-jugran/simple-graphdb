@@ -223,6 +223,9 @@ describe('Facebook Social Graph (MongoDB)', () => {
     await graph.addEdge(frank.id, c17.id, 'COMMENTED_ON_PHOTO', { timestamp: '2024-07-06T17:00:00Z' });
     await graph.addEdge(c17.id, photoMountain.id, 'ON_PHOTO', {});
 
+    // Create index on 'name' property since socialGraphScenarios queries by name
+    await graph.createIndex('node', 'name');
+
     return graph;
   });
 });

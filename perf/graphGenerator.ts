@@ -90,6 +90,9 @@ export async function buildGraph(
   const provider = new InMemoryStorageProvider({ graphId });
   const graph = await Graph.importJSON({ graphId, nodes, edges }, provider);
 
+  // Create indexes for benchmark query patterns
+  await graph.createIndex('node', 'active');
+
   if (typeof global.gc === 'function') global.gc();
   const heapAfter = process.memoryUsage().heapUsed;
   const heapFootprintBytes = Math.max(0, heapAfter - heapBefore);

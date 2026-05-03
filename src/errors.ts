@@ -85,3 +85,37 @@ export class InvalidGraphDataError extends GraphError {
     Object.setPrototypeOf(this, InvalidGraphDataError.prototype);
   }
 }
+
+/**
+ * Error thrown when a node or edge has non-primitive property values.
+ * Properties must be flat key/value pairs with primitive values only.
+ */
+export class InvalidPropertyError extends GraphError {
+  constructor(propertyKey: string, propertyValue: unknown) {
+    super(`Invalid property value for key '${propertyKey}': property values must be primitives only. Received: ${JSON.stringify(propertyValue)}`);
+    this.name = 'InvalidPropertyError';
+    Object.setPrototypeOf(this, InvalidPropertyError.prototype);
+  }
+}
+
+/**
+ * Error thrown when attempting to add a property that already exists
+ */
+export class PropertyAlreadyExistsError extends GraphError {
+  constructor(targetType: 'node' | 'edge', targetId: string, propertyKey: string) {
+    super(`Property '${propertyKey}' already exists on ${targetType} '${targetId}'`);
+    this.name = 'PropertyAlreadyExistsError';
+    Object.setPrototypeOf(this, PropertyAlreadyExistsError.prototype);
+  }
+}
+
+/**
+ * Error thrown when attempting to update a property that does not exist
+ */
+export class PropertyNotFoundError extends GraphError {
+  constructor(targetType: 'node' | 'edge', targetId: string, propertyKey: string) {
+    super(`Property '${propertyKey}' not found on ${targetType} '${targetId}'`);
+    this.name = 'PropertyNotFoundError';
+    Object.setPrototypeOf(this, PropertyNotFoundError.prototype);
+  }
+}

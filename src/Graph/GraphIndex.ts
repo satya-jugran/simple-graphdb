@@ -5,7 +5,9 @@ import {
   EdgeAlreadyExistsError,
   NodeNotFoundError,
   NodeHasEdgesError,
+  InvalidPropertyError,
 } from '../errors';
+import { isFlatRecord, isPrimitive } from '../utils';
 import type { IStorageProvider } from '../storage/IStorageProvider';
 import { InMemoryStorageProvider } from '../storage/InMemoryStorageProvider';
 
@@ -65,9 +67,22 @@ export class GraphIndex {
 
   /**
    * Adds a new node to the graph.
+   * @throws InvalidPropertyError if properties contain non-primitive values
    * @throws NodeAlreadyExistsError if a node with this id already exists
    */
   async addNode(type: string, properties: Record<string, unknown> = {}): Promise<Node> {
+    // Validate properties are flat primitives
+    if (!isFlatRecord(properties)) {
+      const invalidEntry = Object.entries(properties).find(([, value]) => {
+        if (value === null || value === undefined) return false;
+        const t = typeof value;
+        return t === 'object' || t === 'function';
+      });
+      if (invalidEntry) {
+        throw new InvalidPropertyError(invalidEntry[0], invalidEntry[1]);
+      }
+    }
+
     const node = new Node(type, properties);
     if (await this._store.hasNode(node.id)) {
       throw new NodeAlreadyExistsError(node.id);
@@ -128,6 +143,7 @@ export class GraphIndex {
 
   /**
    * Adds a new directed edge to the graph.
+   * @throws InvalidPropertyError if properties contain non-primitive values
    * @throws NodeNotFoundError if source or target node doesn't exist
    * @throws EdgeAlreadyExistsError if an edge with this id already exists
    */
@@ -137,6 +153,18 @@ export class GraphIndex {
     type: string,
     properties: Record<string, unknown> = {}
   ): Promise<Edge> {
+    // Validate properties are flat primitives
+    if (!isFlatRecord(properties)) {
+      const invalidEntry = Object.entries(properties).find(([, value]) => {
+        if (value === null || value === undefined) return false;
+        const t = typeof value;
+        return t === 'object' || t === 'function';
+      });
+      if (invalidEntry) {
+        throw new InvalidPropertyError(invalidEntry[0], invalidEntry[1]);
+      }
+    }
+
     const [sourceExists, targetExists] = await Promise.all([
       this._store.hasNode(sourceId),
       this._store.hasNode(targetId),
@@ -292,5 +320,96 @@ export class GraphIndex {
   /** Clears all data and indices. */
   async clear(): Promise<void> {
     await this._store.clear();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Node property mutations
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Adds a property to a node. Fails if the property key already exists.
+   * @throws InvalidPropertyError if the value is not a primitive
+   */
+  async addNodeProperty(nodeId: string, key: string, value: unknown): Promise<void> {
+    if (!isPrimitive(value)) {
+      throw new InvalidPropertyError(key, value);
+    }
+    await this._store.addNodeProperty(nodeId, key, value);
+  }
+
+  /**
+   * Updates an existing property on a node. Fails if the property doesn't exist.
+   * @throws InvalidPropertyError if the value is not a primitive
+   */
+  async updateNodeProperty(nodeId: string, key: string, value: unknown): Promise<void> {
+    if (!isPrimitive(value)) {
+      throw new InvalidPropertyError(key, value);
+    }
+    await this._store.updateNodeProperty(nodeId, key, value);
+  }
+
+  /**
+   * Deletes a property from a node.
+   */
+  async deleteNodeProperty(nodeId: string, key: string): Promise<void> {
+    await this._store.deleteNodeProperty(nodeId, key);
+  }
+
+  /**
+   * Clears all properties from a node.
+   */
+  async clearNodeProperties(nodeId: string): Promise<void> {
+    await this._store.clearNodeProperties(nodeId);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Edge property mutations
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Adds a property to an edge. Fails if the property key already exists.
+   * @throws InvalidPropertyError if the value is not a primitive
+   */
+  async addEdgeProperty(edgeId: string, key: string, value: unknown): Promise<void> {
+    if (!isPrimitive(value)) {
+      throw new InvalidPropertyError(key, value);
+    }
+    await this._store.addEdgeProperty(edgeId, key, value);
+  }
+
+  /**
+   * Updates an existing property on an edge. Fails if the property doesn't exist.
+   * @throws InvalidPropertyError if the value is not a primitive
+   */
+  async updateEdgeProperty(edgeId: string, key: string, value: unknown): Promise<void> {
+    if (!isPrimitive(value)) {
+      throw new InvalidPropertyError(key, value);
+    }
+    await this._store.updateEdgeProperty(edgeId, key, value);
+  }
+
+  /**
+   * Deletes a property from an edge.
+   */
+  async deleteEdgeProperty(edgeId: string, key: string): Promise<void> {
+    await this._store.deleteEdgeProperty(edgeId, key);
+  }
+
+  /**
+   * Clears all properties from an edge.
+   */
+  async clearEdgeProperties(edgeId: string): Promise<void> {
+    await this._store.clearEdgeProperties(edgeId);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Index management
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Creates an index on a node or edge property.
+   */
+  async createIndex(target: 'node' | 'edge', propertyKey: string, type?: string): Promise<void> {
+    await this._store.createIndex(target, propertyKey, type);
   }
 }

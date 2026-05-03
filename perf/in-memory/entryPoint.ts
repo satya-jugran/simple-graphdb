@@ -32,7 +32,7 @@ async function main(): Promise<void> {
   console.log('\n');
   console.log('╔══════════════════════════════════════════════════════════════════════════════╗');
   console.log('║          simple-graphdb  ·  In-Memory Performance Test Suite                 ║');
-  console.log('║          Benchmarks: Write · Read · Navigation · Traversal · Analysis       ║');
+  console.log('║          Benchmarks: Write · Read · Navigation · Traversal · Analysis        ║');
   console.log('╚══════════════════════════════════════════════════════════════════════════════╝');
 
   if (typeof global.gc !== 'function') {

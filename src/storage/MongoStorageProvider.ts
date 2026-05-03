@@ -12,7 +12,12 @@ import {
   NodeAlreadyExistsError,
   EdgeAlreadyExistsError,
   NodeNotFoundError,
+  EdgeNotFoundError,
+  InvalidPropertyError,
+  PropertyAlreadyExistsError,
+  PropertyNotFoundError,
 } from '../errors';
+import { isPrimitive } from '../utils';
 
 /**
  * MongoDB document shape for nodes.
@@ -406,6 +411,243 @@ export class MongoStorageProvider implements IStorageProvider {
       for (let i = 0; i < edgeDocs.length; i += this._batchSize) {
         await this._edges.insertMany(edgeDocs.slice(i, i + this._batchSize));
       }
+    }
+  }
+
+  /**
+   * Creates an index on a node or edge property.
+   *
+   * @param target - Either 'node' or 'edge'
+   * @param propertyKey - The property name to index
+   * @param type - Optional type filter. If provided (not '*' or undefined), creates a compound index on (type, propertyKey)
+   */
+  async createIndex(target: 'node' | 'edge', propertyKey: string, type?: string): Promise<void> {
+    if (target === 'node') {
+      const indexFields: Record<string, 1> = { [`properties.${propertyKey}`]: 1 };
+      
+      // If type is specified, create compound index on (type, propertyKey)
+      if (type && type !== '*') {
+        indexFields['type'] = 1;
+        await this._nodes.createIndex(indexFields, {
+          name: `node_${type}_${propertyKey}`,
+          background: true
+        });
+      } else {
+        await this._nodes.createIndex(indexFields, {
+          name: `node_${propertyKey}`,
+          background: true
+        });
+      }
+    } else {
+      const indexFields: Record<string, 1> = { [`properties.${propertyKey}`]: 1 };
+      
+      // If type is specified, create compound index on (type, propertyKey)
+      if (type && type !== '*') {
+        indexFields['type'] = 1;
+        await this._edges.createIndex(indexFields, {
+          name: `edge_${type}_${propertyKey}`,
+          background: true
+        });
+      } else {
+        await this._edges.createIndex(indexFields, {
+          name: `edge_${propertyKey}`,
+          background: true
+        });
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Property mutations
+  // ---------------------------------------------------------------------------
+
+  // ---------------------------------------------------------------------------
+  // Node property mutations
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Adds a property to a node. Fails if the property key already exists.
+   * @throws NodeNotFoundError if the node doesn't exist
+   * @throws PropertyAlreadyExistsError if the property key already exists
+   * @throws InvalidPropertyError if the value is not a primitive
+   */
+  async addNodeProperty(nodeId: string, key: string, value: unknown): Promise<void> {
+    if (!isPrimitive(value)) {
+      throw new InvalidPropertyError(key, value);
+    }
+
+    const node = await this.getNode(nodeId);
+    if (!node) {
+      throw new NodeNotFoundError(nodeId);
+    }
+
+    if (key in node.properties) {
+      throw new PropertyAlreadyExistsError('node', nodeId, key);
+    }
+
+    await this._nodes.updateOne(
+      { graphId: this._graphId, id: nodeId },
+      { $set: { [`properties.${key}`]: value } }
+    );
+  }
+
+  /**
+   * Updates an existing property on a node. Fails if the property doesn't exist.
+   * @throws NodeNotFoundError if the node doesn't exist
+   * @throws PropertyNotFoundError if the property key doesn't exist
+   * @throws InvalidPropertyError if the value is not a primitive
+   */
+  async updateNodeProperty(nodeId: string, key: string, value: unknown): Promise<void> {
+    if (!isPrimitive(value)) {
+      throw new InvalidPropertyError(key, value);
+    }
+
+    const node = await this.getNode(nodeId);
+    if (!node) {
+      throw new NodeNotFoundError(nodeId);
+    }
+
+    if (!(key in node.properties)) {
+      throw new PropertyNotFoundError('node', nodeId, key);
+    }
+
+    await this._nodes.updateOne(
+      { graphId: this._graphId, id: nodeId },
+      { $set: { [`properties.${key}`]: value } }
+    );
+  }
+
+  /**
+   * Deletes a property from a node.
+   * @throws NodeNotFoundError if the node doesn't exist
+   */
+  async deleteNodeProperty(nodeId: string, key: string): Promise<void> {
+    const node = await this.getNode(nodeId);
+    if (!node) {
+      throw new NodeNotFoundError(nodeId);
+    }
+
+    await this._nodes.updateOne(
+      { graphId: this._graphId, id: nodeId },
+      { $unset: { [`properties.${key}`]: '' } }
+    );
+  }
+
+  /**
+   * Clears all properties from a node.
+   * @throws NodeNotFoundError if the node doesn't exist
+   */
+  async clearNodeProperties(nodeId: string): Promise<void> {
+    const node = await this.getNode(nodeId);
+    if (!node) {
+      throw new NodeNotFoundError(nodeId);
+    }
+
+    const updateObj: Record<string, unknown> = {};
+    for (const key of Object.keys(node.properties)) {
+      updateObj[`properties.${key}`] = '';
+    }
+
+    if (Object.keys(updateObj).length > 0) {
+      await this._nodes.updateOne(
+        { graphId: this._graphId, id: nodeId },
+        { $unset: updateObj }
+      );
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Edge property mutations
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Adds a property to an edge. Fails if the property key already exists.
+   * @throws EdgeNotFoundError if the edge doesn't exist
+   * @throws PropertyAlreadyExistsError if the property key already exists
+   * @throws InvalidPropertyError if the value is not a primitive
+   */
+  async addEdgeProperty(edgeId: string, key: string, value: unknown): Promise<void> {
+    if (!isPrimitive(value)) {
+      throw new InvalidPropertyError(key, value);
+    }
+
+    const edge = await this.getEdge(edgeId);
+    if (!edge) {
+      throw new EdgeNotFoundError(edgeId);
+    }
+
+    if (key in edge.properties) {
+      throw new PropertyAlreadyExistsError('edge', edgeId, key);
+    }
+
+    await this._edges.updateOne(
+      { graphId: this._graphId, id: edgeId },
+      { $set: { [`properties.${key}`]: value } }
+    );
+  }
+
+  /**
+   * Updates an existing property on an edge. Fails if the property doesn't exist.
+   * @throws EdgeNotFoundError if the edge doesn't exist
+   * @throws PropertyNotFoundError if the property key doesn't exist
+   * @throws InvalidPropertyError if the value is not a primitive
+   */
+  async updateEdgeProperty(edgeId: string, key: string, value: unknown): Promise<void> {
+    if (!isPrimitive(value)) {
+      throw new InvalidPropertyError(key, value);
+    }
+
+    const edge = await this.getEdge(edgeId);
+    if (!edge) {
+      throw new EdgeNotFoundError(edgeId);
+    }
+
+    if (!(key in edge.properties)) {
+      throw new PropertyNotFoundError('edge', edgeId, key);
+    }
+
+    await this._edges.updateOne(
+      { graphId: this._graphId, id: edgeId },
+      { $set: { [`properties.${key}`]: value } }
+    );
+  }
+
+  /**
+   * Deletes a property from an edge.
+   * @throws EdgeNotFoundError if the edge doesn't exist
+   */
+  async deleteEdgeProperty(edgeId: string, key: string): Promise<void> {
+    const edge = await this.getEdge(edgeId);
+    if (!edge) {
+      throw new EdgeNotFoundError(edgeId);
+    }
+
+    await this._edges.updateOne(
+      { graphId: this._graphId, id: edgeId },
+      { $unset: { [`properties.${key}`]: '' } }
+    );
+  }
+
+  /**
+   * Clears all properties from an edge.
+   * @throws EdgeNotFoundError if the edge doesn't exist
+   */
+  async clearEdgeProperties(edgeId: string): Promise<void> {
+    const edge = await this.getEdge(edgeId);
+    if (!edge) {
+      throw new EdgeNotFoundError(edgeId);
+    }
+
+    const updateObj: Record<string, unknown> = {};
+    for (const key of Object.keys(edge.properties)) {
+      updateObj[`properties.${key}`] = '';
+    }
+
+    if (Object.keys(updateObj).length > 0) {
+      await this._edges.updateOne(
+        { graphId: this._graphId, id: edgeId },
+        { $unset: updateObj }
+      );
     }
   }
 
